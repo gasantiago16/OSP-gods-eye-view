@@ -1,0 +1,12 @@
+# GEV unit tests pin source with LF. Windows core.autocrlf=true turns
+# those pins red. Keep the working tree and the index on LF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.glb binary
+*.wav binary
+*.pbf binary
+*.ico binary
