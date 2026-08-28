@@ -64,5 +64,6 @@ if (-not (Test-Path (Join-Path $Root "node_modules\vite"))) {
   npm.cmd install
 }
 
-Write-Host "God's Eye View → http://127.0.0.1:4173  (World Track stays on :5173)"
-npm.cmd run dev -- --host localhost --port 4173
+Write-Host "God's Eye View → http://localhost:4173  (World Track stays on :5173)"
+Write-Host "First Vite start prebundles Cesium; the splash waits on that plus Google 3D tiles."
+npm.cmd run dev -- --force --host localhost --port 4173

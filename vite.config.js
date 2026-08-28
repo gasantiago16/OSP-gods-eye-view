@@ -7368,6 +7368,16 @@ export default defineConfig(({ mode }) => {
       allowedHosts: (env.HOST === '0.0.0.0' || env.HOST === '::')
         ? true
         : ['localhost', '127.0.0.1', '.local'],
+      // Compile the Cesium graph at server start, not on the first browser
+      // import. Dev `import 'cesium'` resolves to ~1,300 ESM files; without
+      // this the splash sits on "Initializing photorealistic world..." until
+      // Vite finishes (and a stale cache 504s /node_modules/.vite/deps/cesium.js).
+      warmup: {
+        clientFiles: ['./src/main.js'],
+      },
+    },
+    optimizeDeps: {
+      include: ['cesium', '@cesium/engine', '@cesium/widgets', 'satellite.js'],
     },
     // Expose selected API keys to the browser via import.meta.env.*
     define: {

@@ -80,6 +80,8 @@ cd C:\Users\gasan\Projects\OSP-gods-eye-view
 
 Opens **http://localhost:4173** (this Windows box binds Vite to IPv6 `::1`; `http://127.0.0.1:4173` will not connect). `.env` is gitignored; it is filled from OSP `secrets/` (Maps, Cesium ion, OpenSky OAuth).
 
+**Slow splash:** the HTML cover says "Initializing photorealistic world..." until `import * as Cesium from 'cesium'` finishes. In Vite dev that is ~1,300 `@cesium/engine` modules, then `createGooglePhotorealistic3DTileset`, then a 1 s cover dwell. Upstream's ~0.6 s "app ready" is a warm Apple M5 capture, not a cold Windows Vite session. `optimizeDeps.include` + `--force` on `dev-windows.ps1` prebundles Cesium at server start so the browser is not the one compiling it. After that, a refresh should drop the cover once tiles session-start. If it stays up past ~30 s, the Maps key/tiles path failed and the HUD still comes up in fallback.
+
 Windows clones must keep **LF** (`.gitattributes`). `core.autocrlf=true` turns GEV source-pin tests red.
 
 ```powershell
