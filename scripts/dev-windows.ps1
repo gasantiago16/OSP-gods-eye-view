@@ -56,6 +56,23 @@ $envText = Set-DotEnvValue $envText "OPENSKY_CLIENT_SECRET" $opensky.clientSecre
 $envText = Set-DotEnvValue $envText "OPENSKY_AUTH_MODE" "oauth"
 $envText = Set-DotEnvValue $envText "PORT" "4173"
 $envText = Set-DotEnvValue $envText "HOST" "localhost"
+
+$GhEnv = "C:\Users\gasan\Graph_Hockey\.env"
+if (Test-Path $GhEnv) {
+  $xaiKey = $null
+  $xaiBase = "https://api.x.ai/v1"
+  foreach ($line in Get-Content -LiteralPath $GhEnv) {
+    if ($line -match '^\s*XAI_API_KEY=(.*)$') { $xaiKey = $Matches[1].Trim().Trim('"') }
+    if ($line -match '^\s*XAI_BASE_URL=(.*)$') { $xaiBase = $Matches[1].Trim().Trim('"') }
+  }
+  if ($xaiKey) {
+    $envText = Set-DotEnvValue $envText "XAI_API_KEY" $xaiKey
+    $envText = Set-DotEnvValue $envText "XAI_BASE_URL" $xaiBase
+    $envText = Set-DotEnvValue $envText "XAI_HUD_MODEL" "grok-4.6"
+    $envText = Set-DotEnvValue $envText "XAI_REALTIME_MODEL" "grok-voice-latest"
+    $envText = Set-DotEnvValue $envText "XAI_REALTIME_VOICE" "eve"
+  }
+}
 Set-Content -LiteralPath $envPath -Value $envText -NoNewline -Encoding utf8
 
 if (-not (Test-Path (Join-Path $Root "node_modules\vite"))) {

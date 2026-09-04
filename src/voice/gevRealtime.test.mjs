@@ -2728,7 +2728,7 @@ test('F1: toggling tier mid-session does not erase accrued spend', () => {
   const { controller } = costControllerHarness();
   controller.status = 'listening'; // live session
   controller.costTracker = createVoiceCostTracker({
-    modelId: 'gpt-realtime-2',
+    modelId: 'grok-voice-latest',
     limits: { warnUsd: 2, capUsd: 5 },
   });
   controller.recordUsage(usdUsage(3));
@@ -2738,7 +2738,7 @@ test('F1: toggling tier mid-session does not erase accrued spend', () => {
 
   const after = controller.costTracker.state();
   assert.ok(Math.abs(after.totalUsd - 3) < 1e-9, `accrued spend survived: ${after.totalUsd}`);
-  assert.equal(after.modelId, 'gpt-realtime-2', 'session keeps its original model binding');
+  assert.equal(after.modelId, 'grok-voice-latest', 'session keeps its original model binding');
 });
 
 test('F1: the cap still fires after a mid-session toggle, at the original rates', () => {
@@ -2747,7 +2747,7 @@ test('F1: the cap still fires after a mid-session toggle, at the original rates'
   const { controller } = costControllerHarness();
   controller.status = 'listening';
   controller.costTracker = createVoiceCostTracker({
-    modelId: 'gpt-realtime-2',
+    modelId: 'grok-voice-latest',
     limits: { warnUsd: 2, capUsd: 5 },
   });
   for (let i = 0; i < 4; i += 1) {
@@ -2774,7 +2774,7 @@ test('F1: when idle, toggling does re-price the preview meter', () => {
   const { controller } = costControllerHarness();
   controller.status = 'idle';
   controller.setVoiceTier('mini');
-  assert.equal(controller.costTracker.state().modelId, 'gpt-realtime-2.1-mini');
+  assert.equal(controller.costTracker.state().modelId, 'grok-voice-think-fast-1.0');
 });
 
 test('F4: once the cap latches, queued function calls do not execute', async () => {
@@ -2806,7 +2806,7 @@ test('F4: a cap between tool events stops every later tool', async () => {
   controller.status = 'listening';
   controller.dc = { readyState: 'open', send() {}, close() {} };
   controller.costTracker = createVoiceCostTracker({
-    modelId: 'gpt-realtime-2',
+    modelId: 'grok-voice-latest',
     limits: { warnUsd: 2, capUsd: 5 },
   });
 
@@ -2883,7 +2883,7 @@ test('F5: a response in flight at teardown marks the accounting INCOMPLETE', () 
   const { controller } = costControllerHarness();
   controller.status = 'listening';
   controller.costTracker = createVoiceCostTracker({
-    modelId: 'gpt-realtime-2',
+    modelId: 'grok-voice-latest',
     limits: { warnUsd: 2, capUsd: 5 },
   });
   controller.recordUsage(usdUsage(1));
@@ -2900,7 +2900,7 @@ test('F5: a response in flight at teardown marks the accounting INCOMPLETE', () 
 test('F5: a clean teardown does not mark the total incomplete', () => {
   const { controller } = costControllerHarness();
   controller.status = 'listening';
-  controller.costTracker = createVoiceCostTracker({ modelId: 'gpt-realtime-2' });
+  controller.costTracker = createVoiceCostTracker({ modelId: 'grok-voice-latest' });
   controller.recordUsage(usdUsage(1));
   controller.responseActive = false;
   controller.dc = { readyState: 'open', send() {}, close() {} };
@@ -2933,7 +2933,7 @@ test('F3: setVoiceTier does NOT rebuild the tracker while transport is live', ()
   // late response.done — rebuilding there sends that usage to a preview tracker.
   const { controller } = costControllerHarness();
   controller.costTracker = createVoiceCostTracker({
-    modelId: 'gpt-realtime-2',
+    modelId: 'grok-voice-latest',
     limits: { warnUsd: 2, capUsd: 5 },
   });
   controller.recordUsage(usdUsage(3));
@@ -2945,7 +2945,7 @@ test('F3: setVoiceTier does NOT rebuild the tracker while transport is live', ()
 
   const state = controller.costTracker.state();
   assert.ok(Math.abs(state.totalUsd - 3) < 1e-9, `spend survived: ${state.totalUsd}`);
-  assert.equal(state.modelId, 'gpt-realtime-2');
+  assert.equal(state.modelId, 'grok-voice-latest');
 });
 
 test('F3: once fully settled, setVoiceTier does rebuild the preview tracker', () => {
@@ -2955,7 +2955,7 @@ test('F3: once fully settled, setVoiceTier does rebuild the preview tracker', ()
   controller.pc = null;
   assert.equal(controller.isVoiceSessionSettled(), true);
   controller.setVoiceTier('mini');
-  assert.equal(controller.costTracker.state().modelId, 'gpt-realtime-2.1-mini');
+  assert.equal(controller.costTracker.state().modelId, 'grok-voice-think-fast-1.0');
 });
 
 test('F4: two clicks during a live session return to the original preference', () => {
@@ -2963,7 +2963,7 @@ test('F4: two clicks during a live session return to the original preference', (
   // TRACKER, so every click during a standard session selected 'mini' again.
   const { controller, ui } = costControllerHarness();
   controller.status = 'listening';
-  controller.costTracker = createVoiceCostTracker({ modelId: 'gpt-realtime-2' });
+  controller.costTracker = createVoiceCostTracker({ modelId: 'grok-voice-latest' });
   controller.voiceTier = 'standard';
 
   controller.toggleVoiceTier();
@@ -2977,7 +2977,7 @@ test('F4: two clicks during a live session return to the original preference', (
 test('F4: the toggle alternates across many clicks mid-session', () => {
   const { controller } = costControllerHarness();
   controller.status = 'listening';
-  controller.costTracker = createVoiceCostTracker({ modelId: 'gpt-realtime-2' });
+  controller.costTracker = createVoiceCostTracker({ modelId: 'grok-voice-latest' });
   controller.voiceTier = 'standard';
   const seen = [];
   for (let i = 0; i < 4; i += 1) seen.push(controller.toggleVoiceTier());
@@ -2992,7 +2992,7 @@ test('F3: an unrecognised session model bills at the most expensive known rates'
     limits: { warnUsd: 2, capUsd: 5 },
   });
   assert.equal(tracker.state().ratesRecognized, false);
-  const standard = createVoiceCostTracker({ modelId: 'gpt-realtime-2' });
+  const standard = createVoiceCostTracker({ modelId: 'grok-voice-latest' });
   const unknownCost = tracker.record(usdUsage(1)).totalUsd;
   const standardCost = standard.record(usdUsage(1)).totalUsd;
   assert.ok(unknownCost >= standardCost, 'never cheaper than the priciest known model');

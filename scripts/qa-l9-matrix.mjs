@@ -1010,8 +1010,8 @@ check({
     if (guard) return guard;
     if (env.keys.OPENAI === true) return skip('server HAS an OpenAI key — the keyless path needs an unkeyed server', 'N/A');
     const r = await jget('/api/realtime/token', { method: 'POST' });
-    return r.status === 503 && /OPENAI_API_KEY is not set/.test(r.text)
-      ? pass('503 "OPENAI_API_KEY is not set"')
+    return r.status === 503 && /XAI_API_KEY is not set/.test(r.text)
+      ? pass('503 "XAI_API_KEY is not set"')
       : fail(`expected 503, got ${r.status} ${r.text.slice(0, 120)}`);
   },
 });
@@ -1035,7 +1035,7 @@ check({
       // negative assertion. The one documented exception is the keyless
       // 503 {status:'missing-key'} from /api/ais-live, which IS its real shape.
       const documentedKeyless = r.status === 503
-        && (r.json?.status === 'missing-key' || r.json?.error === 'no_key' || /OPENAI_API_KEY is not set/.test(r.text));
+        && (r.json?.status === 'missing-key' || r.json?.error === 'no_key' || /XAI_API_KEY is not set/.test(r.text));
       if (!r.ok && !documentedKeyless) {
         unscannable.push(`${p} (HTTP ${r.status})`);
         continue;
@@ -2016,7 +2016,7 @@ async function runBrowserGroup(record) {
     }, null, 60000);
     if (!surfacedR.ok) return crash(`could not drive the keyless voice path: ${surfacedR.reason}`);
     const surfaced = surfacedR.value;
-    const saysKey = /OPENAI_API_KEY is not set/i.test(`${surfaced.errorDetail || ''} ${surfaced.recentError?.message || ''}`);
+    const saysKey = /XAI_API_KEY is not set/i.test(`${surfaced.errorDetail || ''} ${surfaced.recentError?.message || ''}`);
     const saysUnavailable = surfaced.dataStatus === 'error' || /ERROR|UNAVAILABLE/i.test(`${surfaced.status || ''} ${surfaced.detail || ''}`);
     if (!surfaced.appAlive) return fail('the app died when voice was started without a key — a missing optional key must never take the globe down');
     if (!saysUnavailable) {
@@ -2087,7 +2087,7 @@ async function preflight() {
   } else {
     try {
       const t = await jget('/api/realtime/token', { method: 'POST' });
-      if (t.status === 503 && /OPENAI_API_KEY is not set/.test(t.text)) env.keys.OPENAI = false;
+      if (t.status === 503 && /XAI_API_KEY is not set/.test(t.text)) env.keys.OPENAI = false;
       else if (t.ok) env.keys.OPENAI = true;
       else env.keys.OPENAI = 'error';
     } catch { env.keys.OPENAI = 'error'; }

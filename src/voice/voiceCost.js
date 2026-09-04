@@ -24,34 +24,29 @@
 /**
  * ⚠️ VERIFY AT RELEASE — MODEL IDS AND PRICES ARE EXTERNAL FACTS THAT DRIFT. ⚠️
  *
- * Both model ids and every rate below were read from OpenAI's own model +
- * pricing pages on 2026-08-18:
- *   - https://developers.openai.com/api/docs/models/gpt-realtime-2
- *   - https://developers.openai.com/api/docs/models/gpt-realtime-2.1-mini
- *   - https://developers.openai.com/api/docs/pricing
+ * SpaceXAI (xAI) Grok Voice is billed per audio minute, not OpenAI token
+ * tables. Ids and minute rates were read from https://docs.x.ai (2026-08-29):
+ *   - standard: grok-voice-latest → grok-voice-think-fast-2.0 (~$0.08/min)
+ *   - mini: grok-voice-think-fast-1.0 (~$0.05/min, deprecated but cheaper)
  *
- * Cross-check at release time (a wrong rate silently mis-sizes the spend cap,
- * and a wrong model id fails the session at connect time):
- *   - `standard` MUST stay in sync with OPENAI_REALTIME_MODEL / the
- *     OPENAI_REALTIME_MODEL_DEFAULT constant in vite.config.js.
- *   - `mini` has no in-repo history — it is new here. OpenAI publishes both
- *     `gpt-realtime-2.1-mini` (current, used below) and an older
- *     `gpt-realtime-mini`; there is NO `gpt-realtime-2-mini`. If the id ever
- *     moves, override it with OPENAI_REALTIME_MODEL_MINI rather than editing
- *     code — see .env.example.
+ * `standard` MUST stay in sync with XAI_REALTIME_MODEL / VOICE_MODELS in
+ * vite.config.js. Override with XAI_REALTIME_MODEL[_MINI] rather than editing
+ * code if xAI moves an alias.
  *
- * Rates are USD per 1,000,000 tokens.
+ * Token `rates` remain as a conservative fallback when a response.done payload
+ * still reports OpenAI-shaped usage. Wall-clock minute billing is primary.
  */
-export const VOICE_MODEL_RATES_VERIFIED_ON = '2026-08-18';
+export const VOICE_MODEL_RATES_VERIFIED_ON = '2026-08-29';
 
 /** @typedef {'standard'|'mini'} VoiceModelTier */
 
 export const VOICE_MODELS = Object.freeze({
   standard: Object.freeze({
     tier: 'standard',
-    id: 'gpt-realtime-2',
+    id: 'grok-voice-latest',
     label: 'STANDARD',
-    /** USD per 1M tokens — gpt-realtime-2. */
+    usdPerMinute: 0.08,
+    /** Fallback USD per 1M tokens if a usage payload still has token buckets. */
     rates: Object.freeze({
       textInput: 4,
       textCachedInput: 0.4,
@@ -65,9 +60,10 @@ export const VOICE_MODELS = Object.freeze({
   }),
   mini: Object.freeze({
     tier: 'mini',
-    id: 'gpt-realtime-2.1-mini',
+    id: 'grok-voice-think-fast-1.0',
     label: 'MINI',
-    /** USD per 1M tokens — gpt-realtime-2.1-mini (~3.2× cheaper on audio). */
+    usdPerMinute: 0.05,
+    /** Fallback USD per 1M tokens if a usage payload still has token buckets. */
     rates: Object.freeze({
       textInput: 0.6,
       textCachedInput: 0.06,
@@ -414,6 +410,20 @@ export function createVoiceCostTracker(options = {}) {
       : null,
   });
 
+  const latch = () => {
+    let warnCrossed = false;
+    let capCrossed = false;
+    if (!warned && totalUsd >= limits.warnUsd) {
+      warned = true;
+      warnCrossed = true;
+    }
+    if (!capped && totalUsd >= limits.capUsd) {
+      capped = true;
+      capCrossed = true;
+    }
+    return snapshot(warnCrossed, capCrossed);
+  };
+
   return {
     model,
     limits,
@@ -427,17 +437,18 @@ export function createVoiceCostTracker(options = {}) {
         totalUsd += usd;
         responses += 1;
       }
-      let warnCrossed = false;
-      let capCrossed = false;
-      if (!warned && totalUsd >= limits.warnUsd) {
-        warned = true;
-        warnCrossed = true;
-      }
-      if (!capped && totalUsd >= limits.capUsd) {
-        capped = true;
-        capCrossed = true;
-      }
-      return snapshot(warnCrossed, capCrossed);
+      return latch();
+    },
+    /**
+     * Fold wall-clock audio time into the session total using usdPerMinute.
+     * Primary meter for Grok Voice ($/min).
+     */
+    recordElapsedSeconds(seconds) {
+      const rate = nonNegative(model.usdPerMinute)
+        || nonNegative(mostExpensiveVoiceModel().usdPerMinute);
+      const usd = rate * (nonNegative(seconds) / 60);
+      if (usd > 0) totalUsd += usd;
+      return latch();
     },
     /** Current state without folding in new usage. */
     state: () => snapshot(),

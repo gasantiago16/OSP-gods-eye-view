@@ -11,7 +11,7 @@ import {
 } from './voiceCost.js';
 
 const TOKEN_URL = '/api/realtime/token';
-const REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
+const XAI_PCM_RATE = 24000;
 const STATUS = {
   idle: 'OFF',
   connecting: 'CONNECTING',
@@ -234,8 +234,14 @@ export class GevRealtimeController {
     this.radioVoiceDucked = false;
     this.pc = null;
     this.dc = null;
+    this.ws = null;
     this.stream = null;
     this.audioEl = null;
+    this.pcmCapture = null;
+    this.pcmPlayer = null;
+    this.costTicker = null;
+    this.costTickAt = 0;
+    this.sessionConfig = null;
     this.visualizerAudioContext = null;
     this.visualizerAnalyser = null;
     this.visualizerSource = null;
@@ -342,8 +348,8 @@ export class GevRealtimeController {
     this.pushToTalkMode = pushToTalk;
     this.pushToTalkKeyHeld = pushToTalkKeyHeld;
     this.spaceKeyHeld = spaceKeyHeld;
-    if (!window.RTCPeerConnection || !navigator.mediaDevices?.getUserMedia) {
-      this.setStatus('error', 'WebRTC microphone support unavailable');
+    if (typeof WebSocket === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      this.setStatus('error', 'WebSocket microphone support unavailable');
       return;
     }
 
@@ -372,15 +378,11 @@ export class GevRealtimeController {
       connection: this.connectionDiagnostics(),
     });
     let localStream = null;
-    let localPc = null;
+    let localWs = null;
     try {
       const minted = await fetchRealtimeToken(this.voiceTier);
       const token = minted.token;
-      if (this.abandonStart(epoch, { localStream, localPc })) return;
-      // Bind the session meter to the model actually served. An env override
-      // (OPENAI_REALTIME_MODEL[_MINI]) can point a tier at a different model,
-      // and pricing by the tier we asked for would then under-meter and let the
-      // cap be overrun. Unrecognised ids bill at worst-case rates.
+      if (this.abandonStart(epoch, { localStream, localWs })) return;
       this.costTracker = createVoiceCostTracker({
         modelId: minted.model || resolveVoiceModel(this.voiceTier).id,
         limits: this.voiceLimits,
@@ -408,100 +410,22 @@ export class GevRealtimeController {
           channelCount: 1,
         },
       });
-      if (this.abandonStart(epoch, { localStream, localPc })) return;
+      if (this.abandonStart(epoch, { localStream, localWs })) return;
       this.stream = localStream;
       this.setMicrophoneEnabled(!this.pushToTalkMode || this.pushToTalkKeyHeld);
       this.startVoiceVisualizer(localStream);
 
-      document.querySelectorAll('audio[data-gev-realtime-audio="true"]').forEach((el) => el.remove());
-      this.audioEl = document.createElement('audio');
-      this.audioEl.autoplay = true;
-      this.audioEl.dataset.gevRealtimeAudio = 'true';
-      this.audioEl.style.display = 'none';
-      document.body.appendChild(this.audioEl);
-
-      localPc = new RTCPeerConnection();
-      this.pc = localPc;
-      this.pc.ontrack = (event) => {
-        const remoteStream = event.streams[0];
-        this.audioEl.srcObject = remoteStream;
-        this.startAssistantVoiceVisualizer(remoteStream);
-      };
-      this.pc.onconnectionstatechange = () => this.handleConnectionStateChange();
-      this.pc.oniceconnectionstatechange = () => {
-        if (this.pc?.iceConnectionState === 'failed') {
-          this.fatalError('ICE connection', null, this.connectionDiagnostics());
-        }
-      };
-      this.pc.onicecandidateerror = (event) => {
-        this.reportError('ICE candidate', event, {
-          errorCode: event.errorCode,
-          errorText: event.errorText,
-          address: event.address,
-          port: event.port,
-          url: event.url,
-          ...this.connectionDiagnostics(),
-        });
-      };
-      this.stream.getTracks().forEach((track) => this.pc.addTrack(track, this.stream));
-
-      const dataChannel = this.pc.createDataChannel('oai-events');
-      this.dc = dataChannel;
-      dataChannel.addEventListener('open', () => {
-        const detail = this.pushToTalkMode
-          ? (this.pushToTalkKeyHeld ? 'Release Space to send' : 'Hold Space to talk')
-          : 'Ask or command';
-        this.setStatus('listening', detail);
-        this.debugLog('data_channel.open', { connection: this.connectionDiagnostics(dataChannel) });
-      });
-      dataChannel.addEventListener('message', (event) => this.handleRealtimeEvent(event));
-      dataChannel.addEventListener('error', (event) => {
-        // Skip if we're mid-teardown (the close we triggered) — otherwise a real
-        // channel error tears the session down so the mic doesn't stay live (H8).
-        if (this._tearingDown || this.dc !== dataChannel) return;
-        this.fatalError('Realtime data channel', event, this.connectionDiagnostics(dataChannel));
-      });
-      dataChannel.addEventListener('close', () => {
-        if (this._tearingDown) return;
-        if (this.dc === dataChannel && this.status !== 'idle' && this.status !== 'error') {
-          this.fatalError('Realtime data channel closed', null, this.connectionDiagnostics(dataChannel));
-        }
-      });
-
-      const offer = await this.pc.createOffer();
-      await this.pc.setLocalDescription(offer);
-      if (this.abandonStart(epoch, { localStream, localPc })) return;
-      this.debugLog('webrtc.offer.created', {
-        sdpLength: offer.sdp?.length || 0,
-        connection: this.connectionDiagnostics(),
-      });
-      const sdpResponse = await fetch(REALTIME_CALLS_URL, {
-        method: 'POST',
-        body: offer.sdp,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/sdp',
-        },
-      });
-      if (this.abandonStart(epoch, { localStream, localPc })) return;
-      if (!sdpResponse.ok) {
-        const body = await sdpResponse.text().catch(() => '');
-        throw new Error(`Realtime SDP failed: HTTP ${sdpResponse.status}${body ? ` - ${compactText(body, 240)}` : ''}`);
-      }
-      const answerSdp = await sdpResponse.text();
-      if (this.abandonStart(epoch, { localStream, localPc })) return;
-      await this.pc.setRemoteDescription({
-        type: 'answer',
-        sdp: answerSdp,
-      });
-      if (this.abandonStart(epoch, { localStream, localPc })) return;
-      this.debugLog('webrtc.answer.applied', { connection: this.connectionDiagnostics() });
+      const wsUrl = minted.wsUrl;
+      if (!wsUrl || !token) throw new Error('Realtime token response missing wsUrl or client secret');
+      localWs = new WebSocket(wsUrl, [`xai-client-secret.${token}`]);
+      this.ws = localWs;
+      this.sessionConfig = minted.session || null;
+      await this.bindXaiSocket(localWs, epoch);
+      if (this.abandonStart(epoch, { localStream, localWs })) return;
+      this.startXaiCostTicker();
     } catch (error) {
-      // A superseded attempt should die quietly — its resources are already
-      // released by abandonStart / the newer start(), and surfacing its error
-      // would clobber the live session's status (H7).
       if (epoch !== this.startEpoch) {
-        releaseStartResources({ localStream, localPc });
+        releaseStartResources({ localStream, localWs });
         return;
       }
       const diagnostics = this.connectionDiagnostics();
@@ -525,9 +449,116 @@ export class GevRealtimeController {
       this.pc = null;
       this.dc = null;
     }
+    if (resources.localWs && this.ws === resources.localWs) {
+      this.ws = null;
+      this.dc = null;
+    }
     releaseStartResources(resources);
     this.debugLog('session.start.abandoned', { epoch, currentEpoch: this.startEpoch });
     return true;
+  }
+
+  bindXaiSocket(ws, epoch) {
+    return new Promise((resolve, reject) => {
+      const onOpen = () => {
+        cleanup();
+        if (epoch !== this.startEpoch) {
+          resolve();
+          return;
+        }
+        this.dc = wrapSocketAsChannel(ws);
+        this.pcmPlayer = createPcmPlayer(XAI_PCM_RATE);
+        if (this.sessionConfig) {
+          this.sendRealtimeEvent({ type: 'session.update', session: this.sessionConfig }, 'client.session_update');
+        }
+        this.startPcmCapture();
+        const detail = this.pushToTalkMode
+          ? (this.pushToTalkKeyHeld ? 'Release Space to send' : 'Hold Space to talk')
+          : 'Ask or command';
+        this.setStatus('listening', detail);
+        this.debugLog('xai.socket.open', { connection: this.connectionDiagnostics() });
+        resolve();
+      };
+      const onError = (event) => {
+        cleanup();
+        reject(event?.error || new Error('Realtime WebSocket failed'));
+      };
+      const onClose = () => {
+        cleanup();
+        if (this._tearingDown) return;
+        if (this.ws === ws && this.status !== 'idle' && this.status !== 'error') {
+          this.fatalError('Realtime WebSocket closed', null, this.connectionDiagnostics());
+        }
+      };
+      const onMessage = (event) => this.handleXaiSocketMessage(event);
+      const cleanup = () => {
+        ws.removeEventListener('open', onOpen);
+        ws.removeEventListener('error', onError);
+      };
+      ws.addEventListener('open', onOpen);
+      ws.addEventListener('error', onError);
+      ws.addEventListener('close', onClose);
+      ws.addEventListener('message', onMessage);
+    });
+  }
+
+  handleXaiSocketMessage(event) {
+    if (typeof event.data !== 'string') return;
+    let payload = null;
+    try {
+      payload = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    if (payload?.type === 'response.output_audio.delta' || payload?.type === 'response.audio.delta') {
+      const delta = payload.delta || payload.audio;
+      if (delta) this.pcmPlayer?.pushBase64(delta);
+    }
+    this.handleRealtimeEvent({ data: event.data });
+  }
+
+  startPcmCapture() {
+    this.stopPcmCapture();
+    if (!this.stream) return;
+    const capture = createPcmCapture(this.stream, XAI_PCM_RATE, (base64) => {
+      if (!this.realtimeOpen()) return;
+      if (this.pushToTalkMode && !this.pushToTalkKeyHeld) return;
+      this.sendRealtimeEvent({
+        type: 'input_audio_buffer.append',
+        audio: base64,
+      }, 'client.input_audio');
+    });
+    this.pcmCapture = capture;
+  }
+
+  stopPcmCapture() {
+    try { this.pcmCapture?.stop(); } catch { /* no-op */ }
+    this.pcmCapture = null;
+  }
+
+  realtimeOpen() {
+    return this.ws?.readyState === WebSocket.OPEN || this.dc?.readyState === 'open';
+  }
+
+  startXaiCostTicker() {
+    this.stopXaiCostTicker();
+    this.costTickAt = performance.now();
+    this.costTicker = window.setInterval(() => {
+      const now = performance.now();
+      const elapsed = (now - this.costTickAt) / 1000;
+      this.costTickAt = now;
+      if (elapsed <= 0 || !this.costTracker?.recordElapsedSeconds) return;
+      const state = this.costTracker.recordElapsedSeconds(elapsed);
+      this.syncCostUi();
+      if (state.capCrossed) this.handleCostCap(state);
+    }, 5000);
+  }
+
+  stopXaiCostTicker() {
+    if (this.costTicker) {
+      window.clearInterval(this.costTicker);
+      this.costTicker = null;
+    }
   }
 
   // WebRTC connection-state transitions. 'failed' is a hard drop → fatal. But
@@ -802,6 +833,10 @@ export class GevRealtimeController {
       status: this.status,
       connection: this.connectionDiagnostics(),
     });
+    this.stopXaiCostTicker();
+    this.stopPcmCapture();
+    try { this.pcmPlayer?.close(); } catch { /* no-op */ }
+    this.pcmPlayer = null;
     if (this.dc) {
       // A response in flight has already accrued billable tokens whose usage
       // only arrives with response.done — which we will never see, because the
@@ -814,10 +849,15 @@ export class GevRealtimeController {
       try { this.dc.close(); } catch { /* no-op */ }
       this.dc = null;
     }
+    if (this.ws) {
+      try { this.ws.close(); } catch { /* no-op */ }
+      this.ws = null;
+    }
     if (this.pc) {
       try { this.pc.close(); } catch { /* no-op */ }
       this.pc = null;
     }
+    this.sessionConfig = null;
     this._tearingDown = false;
     if (this.stream) {
       this.stopVoiceVisualizer();
@@ -1374,6 +1414,9 @@ export class GevRealtimeController {
   }
 
   async sendVisualContextIfUseful(result) {
+    // xAI Grok Voice does not take the OpenAI Realtime image item. Skip
+    // viewport JPEGs; get_entity_context structured fields still ground answers.
+    if (this.ws) return false;
     if (result?.action !== 'get_entity_context' || !this.dc || this.dc.readyState !== 'open') return false;
     const viewScale = result.scene?.basemap?.viewScale;
     if (!shouldSendViewportImage(viewScale)) return false;
@@ -1668,10 +1711,12 @@ export class GevRealtimeController {
 
   sendRealtimeEvent(message, logEventName = 'client.event') {
     if (!this.dc || this.dc.readyState !== 'open') return false;
-    this.debugLog(logEventName, {
-      type: message?.type || null,
-      message,
-    });
+    if (logEventName !== 'client.input_audio') {
+      this.debugLog(logEventName, {
+        type: message?.type || null,
+        message,
+      });
+    }
     // A dc.send() that exceeds the SCTP send-buffer / max message size throws.
     // If that throw escaped it would abort handleRealtimeEvent BEFORE
     // queueResponseCreate + setStatus('listening'), stranding the turn at
@@ -1704,6 +1749,7 @@ export class GevRealtimeController {
   connectionDiagnostics(dataChannel = this.dc) {
     return {
       dataChannelState: dataChannel?.readyState || null,
+      socketState: this.ws?.readyState ?? null,
       connectionState: this.pc?.connectionState || null,
       iceConnectionState: this.pc?.iceConnectionState || null,
       iceGatheringState: this.pc?.iceGatheringState || null,
@@ -2111,7 +2157,7 @@ function createDebugSessionId() {
 // Idempotently tear down a MediaStream + RTCPeerConnection acquired by an
 // abandoned start() attempt. Every close is guarded so double-release (once
 // here, once via stop()) is a no-op — critical for closing the hot mic (H7).
-function releaseStartResources({ localStream = null, localPc = null } = {}) {
+function releaseStartResources({ localStream = null, localPc = null, localWs = null } = {}) {
   if (localStream) {
     try {
       localStream.getTracks().forEach((track) => track.stop());
@@ -2120,6 +2166,91 @@ function releaseStartResources({ localStream = null, localPc = null } = {}) {
   if (localPc) {
     try { localPc.close(); } catch { /* no-op */ }
   }
+  if (localWs) {
+    try { localWs.close(); } catch { /* no-op */ }
+  }
+}
+
+function wrapSocketAsChannel(ws) {
+  return {
+    get readyState() {
+      return ws.readyState === WebSocket.OPEN ? 'open' : 'closed';
+    },
+    send(data) {
+      ws.send(data);
+    },
+    close() {
+      try { ws.close(); } catch { /* no-op */ }
+    },
+  };
+}
+
+function floatToBase64Pcm16(float32) {
+  const pcm = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  const bytes = new Uint8Array(pcm.buffer);
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+function createPcmCapture(stream, sampleRate, onBase64) {
+  const ctx = new AudioContext({ sampleRate });
+  const source = ctx.createMediaStreamSource(stream);
+  const processor = ctx.createScriptProcessor(4096, 1, 1);
+  const mute = ctx.createGain();
+  mute.gain.value = 0;
+  processor.onaudioprocess = (event) => {
+    const input = event.inputBuffer.getChannelData(0);
+    onBase64(floatToBase64Pcm16(input));
+  };
+  source.connect(processor);
+  processor.connect(mute);
+  mute.connect(ctx.destination);
+  return {
+    stop() {
+      try { processor.disconnect(); } catch { /* no-op */ }
+      try { source.disconnect(); } catch { /* no-op */ }
+      try { mute.disconnect(); } catch { /* no-op */ }
+      ctx.close().catch(() => {});
+    },
+  };
+}
+
+function createPcmPlayer(sampleRate) {
+  const ctx = new AudioContext({ sampleRate });
+  let next = 0;
+  return {
+    pushBase64(b64) {
+      try {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const pcm = new Int16Array(bytes.buffer);
+        const f32 = new Float32Array(pcm.length);
+        for (let i = 0; i < pcm.length; i++) f32[i] = pcm[i] / 32768;
+        const buffer = ctx.createBuffer(1, f32.length, ctx.sampleRate);
+        buffer.getChannelData(0).set(f32);
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(ctx.destination);
+        const startAt = Math.max(ctx.currentTime, next);
+        src.start(startAt);
+        next = startAt + buffer.duration;
+      } catch {
+        /* drop a bad audio frame rather than killing the session */
+      }
+    },
+    close() {
+      return ctx.close();
+    },
+  };
 }
 
 function postDebugLog(record) {
@@ -2332,7 +2463,13 @@ async function fetchRealtimeToken(tier = DEFAULT_VOICE_TIER) {
   }
   const token = data?.value || data?.client_secret?.value || data?.client_secret;
   if (!token) throw new Error('Realtime token response did not include a client secret');
-  return { token, model: servedModel, tier: servedTier };
+  return {
+    token,
+    model: servedModel,
+    tier: servedTier,
+    session: data?.session || null,
+    wsUrl: data?.wsUrl || null,
+  };
 }
 
 function extractFunctionCalls(event) {

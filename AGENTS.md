@@ -31,7 +31,7 @@ Never commit `.env`. Fill from OSP:
 | `CESIUM_ION_TOKEN` | `omni_spaceflight/secrets/cesium_ion.token` |
 | `OPENSKY_CLIENT_ID` / `SECRET` | `omni_spaceflight/secrets/opensky_credentials.json` |
 
-Do **not** copy `secrets/muse.env` into `OPENAI_API_KEY`. Voice stays off until a real OpenAI Realtime key exists.
+Voice/HUD use **SpaceXAI** (`XAI_API_KEY`, same account as Graph Hockey). Copy `XAI_API_KEY` + `XAI_BASE_URL` from `Graph_Hockey/.env`. Do **not** copy OSP Muse keys. HUD is `grok-4.6` chat/completions; the mic is `grok-voice-latest`, not grok-4.6.
 
 ## Verify
 

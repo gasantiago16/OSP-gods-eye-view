@@ -17,7 +17,7 @@ The golden rule: **secret-bearing API keys stay on the server side.** The dev/pr
 
 | Key | Where it lives | How the browser uses it |
 |-----|----------------|--------------------------|
-| `OPENAI_API_KEY` | Server only | Browser fetches a short-lived **ephemeral** Realtime session token from `/api/realtime/token`; the real key never ships |
+| `XAI_API_KEY` | Server only | HUD uses `POST /v1/chat/completions`. Browser fetches a short-lived **ephemeral** Grok Voice token from `/api/realtime/token`; the real key never ships |
 | `AISSTREAM_API_KEY` | Server only | Server holds the AISStream websocket; browser polls the same-origin `/api/ais-live` cache |
 | OpenSky OAuth (`OPENSKY_CLIENT_ID/SECRET`) | Server only | Server mints + refreshes the token behind `/api/opensky` |
 

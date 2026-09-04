@@ -190,9 +190,9 @@ async function mintSession() {
   if (!res.ok) throw new Error(`token mint failed: ${res.status} ${(await res.text()).slice(0, 120)}`);
   const body = await res.json();
   const value = body?.value || body?.client_secret?.value;
-  const model = body?.session?.model || 'gpt-realtime';
+  const model = body?.session?.model || body?.wsUrl?.split('model=')[1] || 'grok-voice-latest';
   if (!value) throw new Error(`token mint returned no client secret: ${JSON.stringify(body).slice(0, 160)}`);
-  return { value, model };
+  return { value, model, wsUrl: body?.wsUrl || null };
 }
 
 /** One Realtime WS session that can run several text turns sequentially. */
@@ -207,7 +207,7 @@ class RoutingSession {
 
   connect() {
     return new Promise((resolve, reject) => {
-      const url = `wss://api.openai.com/v1/realtime?model=${encodeURIComponent(this.model)}`;
+      const url = this.wsUrl || `wss://api.x.ai/v1/realtime?model=${encodeURIComponent(this.model)}`;
       const ws = new WebSocket(url, { headers: { Authorization: `Bearer ${this.secret}` } });
       const timer = setTimeout(() => reject(new Error('ws connect timeout')), 15000);
       ws.on('open', () => { clearTimeout(timer); this.ws = ws; resolve(); });

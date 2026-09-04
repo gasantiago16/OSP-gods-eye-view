@@ -1319,11 +1319,26 @@ const AISSTREAM_TICK_MS = 15_000;
 // can never be computed against a different model than the session runs on.
 const OPENAI_REALTIME_MODEL_DEFAULT = VOICE_MODELS.standard.id;
 const OPENAI_REALTIME_MODEL_MINI_DEFAULT = VOICE_MODELS.mini.id;
-const OPENAI_REALTIME_VOICE_DEFAULT = 'marin';
-const OPENAI_REALTIME_REASONING_DEFAULT = 'low';
-const OPENAI_REALTIME_CONTEXT_TOKENS_DEFAULT = 3000;
-const OPENAI_REALTIME_CONTEXT_RETENTION_DEFAULT = 0.5;
-const OPENAI_HUD_SUMMARY_MODEL_DEFAULT = 'gpt-5-nano';
+const OPENAI_REALTIME_VOICE_DEFAULT = 'eve';
+const OPENAI_HUD_SUMMARY_MODEL_DEFAULT = 'grok-4.6';
+
+function xaiApiKey() {
+  return String(process.env.XAI_API_KEY || '').trim();
+}
+
+function xaiBaseUrl() {
+  return String(process.env.XAI_BASE_URL || 'https://api.x.ai/v1').replace(/\/+$/, '');
+}
+
+function xaiRealtimeWsUrl(model) {
+  const http = xaiBaseUrl();
+  const ws = http.startsWith('https://')
+    ? `wss://${http.slice('https://'.length)}`
+    : http.startsWith('http://')
+      ? `ws://${http.slice('http://'.length)}`
+      : http;
+  return `${ws}/realtime?model=${encodeURIComponent(model)}`;
+}
 const REALTIME_DEBUG_LOG_DIR = path.join(__dirname, '.gev-logs');
 const REALTIME_DEBUG_LOG_FILE = path.join(REALTIME_DEBUG_LOG_DIR, 'realtime-conversations.jsonl');
 const REALTIME_DEBUG_LOG_MAX_BYTES = 8 * 1024 * 1024;
@@ -4952,10 +4967,11 @@ function trackBackfillProxies() {
 }
 
 /**
- * Vite plugin: OpenAI Realtime ephemeral client secret.
+ * Vite plugin: SpaceXAI (xAI) HUD summary + Realtime ephemeral client secret.
  *
- * Keeps OPENAI_API_KEY server-side while the browser connects to the
- * Realtime API over WebRTC with a short-lived secret.
+ * Keeps XAI_API_KEY server-side (copied from Graph Hockey). HUD uses
+ * chat/completions (grok-4.6). Voice mints an xAI client secret; the browser
+ * opens a WebSocket with xai-client-secret.<token> and session.update.
  */
 function openAiRealtimeProxy() {
   function install(middlewares) {
@@ -4970,50 +4986,55 @@ function openAiRealtimeProxy() {
       // Opt-in per-IP throttle (GEV_RATELIMIT_OPENAI_PER_MIN). No-op when unset.
       if (!enforceOptInRateLimit(openAiRateLimiter(), req, res)) return;
 
-      const apiKey = process.env.OPENAI_API_KEY;
+      const apiKey = xaiApiKey();
       if (!apiKey) {
         res.statusCode = 503;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: 'OPENAI_API_KEY is not set' }));
+        res.end(JSON.stringify({ error: 'XAI_API_KEY is not set' }));
         return;
       }
 
       try {
         const body = await readRequestBody(req, 64 * 1024);
         const context = JSON.parse(body || '{}');
-        const response = await fetch('https://api.openai.com/v1/responses', {
+        const instructions = [
+          "Write one concise intelligence-HUD summary for God's Eye View.",
+          'Use only the supplied place, street, nearby-place, and enabled-layer text labels.',
+          'Prefer the clearest named place and include a relevant enabled layer only when useful.',
+          'Do not infer from coordinates or invent a place.',
+          'Output exactly five words with no title, punctuation, markdown, or introductory phrase.',
+        ].join(' ');
+        const response = await fetch(`${xaiBaseUrl()}/chat/completions`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: process.env.OPENAI_HUD_SUMMARY_MODEL || OPENAI_HUD_SUMMARY_MODEL_DEFAULT,
-            instructions: [
-              "Write one concise intelligence-HUD summary for God's Eye View.",
-              'Use only the supplied place, street, nearby-place, and enabled-layer text labels.',
-              'Prefer the clearest named place and include a relevant enabled layer only when useful.',
-              'Do not infer from coordinates or invent a place.',
-              'Output exactly five words with no title, punctuation, markdown, or introductory phrase.',
-            ].join(' '),
-            input: JSON.stringify(context),
-            reasoning: { effort: 'minimal' },
-            max_output_tokens: 100,
+            model: process.env.XAI_HUD_MODEL || process.env.OPENAI_HUD_SUMMARY_MODEL || OPENAI_HUD_SUMMARY_MODEL_DEFAULT,
+            messages: [
+              { role: 'system', content: instructions },
+              { role: 'user', content: JSON.stringify(context) },
+            ],
+            max_tokens: 100,
+            reasoning_effort: 'low',
           }),
         });
         const data = await response.json().catch(() => ({}));
-        const summary = toFiveWordHudSummary(extractOpenAiResponseText(data));
+        const summary = toFiveWordHudSummary(
+          extractChatCompletionText(data) || extractOpenAiResponseText(data),
+        );
         res.statusCode = response.ok && summary ? 200 : response.status || 502;
         res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.setHeader('Cache-Control', 'no-store');
         res.end(JSON.stringify({
           summary: summary || null,
-          error: response.ok ? null : data.error?.message || 'OpenAI HUD summary request failed',
+          error: response.ok ? null : data.error?.message || 'HUD summary request failed',
         }));
       } catch (error) {
         res.statusCode = 502;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: error?.message || 'OpenAI HUD summary request failed' }));
+        res.end(JSON.stringify({ error: error?.message || 'HUD summary request failed' }));
       }
     });
 
@@ -5053,20 +5074,18 @@ function openAiRealtimeProxy() {
       // Opt-in per-IP throttle (GEV_RATELIMIT_OPENAI_PER_MIN). No-op when unset.
       if (!enforceOptInRateLimit(openAiRateLimiter(), req, res)) return;
 
-      const apiKey = process.env.OPENAI_API_KEY;
+      const apiKey = xaiApiKey();
       if (!apiKey) {
         res.statusCode = 503;
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: 'OPENAI_API_KEY is not set' }));
+        res.end(JSON.stringify({ error: 'XAI_API_KEY is not set' }));
         return;
       }
 
       // Voice model tier, requested by the client as ?tier=standard|mini.
       // resolveVoiceModel is total: an unknown, empty, or hostile value
-      // resolves to `standard` instead of reaching OpenAI as a model id, so a
+      // resolves to `standard` instead of reaching xAI as a model id, so a
       // bad querystring degrades to a normal session rather than a dead mic.
-      // The env overrides stay authoritative per tier (see .env.example) —
-      // a wrong upstream model id is then a config fix, not a code change.
       const requestedTier = (() => {
         try {
           return new URL(req.url || '', 'http://localhost').searchParams.get('tier');
@@ -5077,41 +5096,22 @@ function openAiRealtimeProxy() {
       const tier = resolveVoiceModel(requestedTier).tier;
       const model =
         tier === 'mini'
-          ? process.env.OPENAI_REALTIME_MODEL_MINI || OPENAI_REALTIME_MODEL_MINI_DEFAULT
-          : process.env.OPENAI_REALTIME_MODEL || OPENAI_REALTIME_MODEL_DEFAULT;
-      const voice = process.env.OPENAI_REALTIME_VOICE || OPENAI_REALTIME_VOICE_DEFAULT;
-      const effort = process.env.OPENAI_REALTIME_REASONING_EFFORT || OPENAI_REALTIME_REASONING_DEFAULT;
-      const contextTokenLimit = Math.round(Math.max(
-        1000,
-        Math.min(12000, Number(process.env.OPENAI_REALTIME_CONTEXT_TOKENS) || OPENAI_REALTIME_CONTEXT_TOKENS_DEFAULT)
-      ));
-      const contextRetentionRatio = Math.max(
-        0.1,
-        Math.min(1, Number(process.env.OPENAI_REALTIME_CONTEXT_RETENTION) || OPENAI_REALTIME_CONTEXT_RETENTION_DEFAULT)
-      );
+          ? process.env.XAI_REALTIME_MODEL_MINI
+            || process.env.OPENAI_REALTIME_MODEL_MINI
+            || OPENAI_REALTIME_MODEL_MINI_DEFAULT
+          : process.env.XAI_REALTIME_MODEL
+            || process.env.OPENAI_REALTIME_MODEL
+            || OPENAI_REALTIME_MODEL_DEFAULT;
+      const voice = process.env.XAI_REALTIME_VOICE
+        || process.env.OPENAI_REALTIME_VOICE
+        || OPENAI_REALTIME_VOICE_DEFAULT;
       const sessionConfig = {
         session: {
-          type: 'realtime',
-          model,
-          reasoning: { effort },
-          truncation: {
-            type: 'retention_ratio',
-            retention_ratio: contextRetentionRatio,
-            token_limits: {
-              post_instructions: contextTokenLimit,
-            },
-          },
+          voice,
+          turn_detection: { type: 'server_vad' },
           audio: {
-            input: {
-              noise_reduction: { type: 'near_field' },
-              turn_detection: {
-                type: 'semantic_vad',
-                eagerness: 'low',
-                create_response: true,
-                interrupt_response: false,
-              },
-            },
-            output: { voice },
+            input: { format: { type: 'audio/pcm', rate: 24000 } },
+            output: { format: { type: 'audio/pcm', rate: 24000 } },
           },
           instructions: [
             "You are GEV Voice Control, a concise voice controller for a Cesium geospatial app called God's Eye View.",
@@ -5178,33 +5178,38 @@ function openAiRealtimeProxy() {
             'PATHS vs DISTANCES: for "walking/driving route from A to B" (or through several stops), use type=route with the ordered points and the matching mode (walking/driving/cycling) — the app draws the real street-following path on the map and reports distance and travel time, which you can read aloud. For "how far is X from Y", "is it nearby", or "X is next to Y", use type=arrow between the two — it draws a floating connector and shows the straight-line distance. Do NOT use route for a simple distance/proximity question.',
           ].join('\n'),
           tools: GEV_REALTIME_TOOLS,
-          tool_choice: 'auto',
         },
       };
 
       try {
-        const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+        const response = await fetch(`${xaiBaseUrl()}/realtime/client_secrets`, {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
-            'OpenAI-Safety-Identifier': 'gev-local-dev',
           },
-          body: JSON.stringify(sessionConfig),
+          body: JSON.stringify({ expires_after: { seconds: 300 } }),
         });
-        const body = await response.text();
-        res.statusCode = response.status;
-        res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
-        // Which tier/model this secret was actually minted for. The upstream
-        // body is passed through untouched (the client parses it verbatim), so
-        // these headers are the authoritative echo — including the case where a
-        // bogus ?tier= was silently downgraded to standard.
+        const minted = await response.json().catch(() => ({}));
+        const token = minted.value || minted.client_secret?.value || minted.client_secret;
+        res.statusCode = response.ok && token ? 200 : (response.status || 502);
+        res.setHeader('Content-Type', 'application/json');
         res.setHeader('X-GEV-Voice-Tier', tier);
         res.setHeader('X-GEV-Voice-Model', model);
         if (requestedTier && !isKnownVoiceTier(requestedTier)) {
           res.setHeader('X-GEV-Voice-Tier-Fallback', '1');
         }
-        res.end(body);
+        if (!response.ok || !token) {
+          res.end(JSON.stringify({
+            error: minted.error?.message || minted.error || 'Failed to create Realtime token',
+          }));
+          return;
+        }
+        res.end(JSON.stringify({
+          value: token,
+          session: sessionConfig.session,
+          wsUrl: xaiRealtimeWsUrl(model),
+        }));
       } catch (error) {
         res.statusCode = 502;
         res.setHeader('Content-Type', 'application/json');
@@ -5222,6 +5227,15 @@ function openAiRealtimeProxy() {
       install(server.middlewares);
     },
   };
+}
+
+function extractChatCompletionText(data) {
+  const content = data?.choices?.[0]?.message?.content;
+  if (typeof content === 'string' && content.trim()) return content.trim();
+  if (Array.isArray(content)) {
+    return content.map((part) => part?.text || '').join(' ').trim();
+  }
+  return '';
 }
 
 function extractOpenAiResponseText(data) {

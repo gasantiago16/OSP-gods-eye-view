@@ -3,7 +3,7 @@
 // open-ended bill, so its arithmetic, its threshold latches, and its
 // unknown-tier fallback are all pinned here. The tier resolver is also a
 // security boundary: it is what stops an arbitrary string reaching the
-// OpenAI API as a model id.
+// xAI API as a model id.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -61,11 +61,11 @@ test('registry exposes exactly the two tiers the UI offers', () => {
 test('standard tier still points at the model vite.config.js defaults to', () => {
   // If this fails, the client cost estimate is being computed against a
   // different model than the session actually runs on.
-  assert.equal(VOICE_MODELS.standard.id, 'gpt-realtime-2');
+  assert.equal(VOICE_MODELS.standard.id, 'grok-voice-latest');
 });
 
 test('mini tier uses a published mini model id, not a guessed -2-mini variant', () => {
-  assert.equal(VOICE_MODELS.mini.id, 'gpt-realtime-2.1-mini');
+  assert.equal(VOICE_MODELS.mini.id, 'grok-voice-think-fast-1.0');
   assert.notEqual(VOICE_MODELS.mini.id, VOICE_MODELS.standard.id);
 });
 
@@ -83,8 +83,8 @@ test('mini is cheaper than standard on every single rate', () => {
 });
 
 test('resolveVoiceModel returns the requested tier', () => {
-  assert.equal(resolveVoiceModel('mini').id, 'gpt-realtime-2.1-mini');
-  assert.equal(resolveVoiceModel('standard').id, 'gpt-realtime-2');
+  assert.equal(resolveVoiceModel('mini').id, 'grok-voice-think-fast-1.0');
+  assert.equal(resolveVoiceModel('standard').id, 'grok-voice-latest');
 });
 
 test('resolveVoiceModel tolerates case and whitespace', () => {
@@ -112,7 +112,7 @@ test('unknown, empty, and hostile tiers fall back to standard rather than throwi
   ]) {
     const resolved = resolveVoiceModel(bad);
     assert.equal(resolved.tier, 'standard', `fallback for ${JSON.stringify(bad)}`);
-    assert.equal(resolved.id, 'gpt-realtime-2');
+    assert.equal(resolved.id, 'grok-voice-latest');
   }
 });
 
@@ -442,7 +442,7 @@ test('the tracker reports the model it is charging against', () => {
   const tracker = createVoiceCostTracker({ tier: 'mini' });
   const state = tracker.state();
   assert.equal(state.tier, 'mini');
-  assert.equal(state.modelId, 'gpt-realtime-2.1-mini');
+  assert.equal(state.modelId, 'grok-voice-think-fast-1.0');
 });
 
 test('an unknown tier tracks at standard rates rather than free', () => {
@@ -457,9 +457,9 @@ test('an unknown tier tracks at standard rates rather than free', () => {
  * -------------------------------------------------------------- */
 
 test('F3: a known model id resolves to its own rate table', () => {
-  assert.equal(resolveVoiceModelById('gpt-realtime-2').tier, 'standard');
-  assert.equal(resolveVoiceModelById('gpt-realtime-2.1-mini').tier, 'mini');
-  assert.equal(resolveVoiceModelById('gpt-realtime-2').recognized, true);
+  assert.equal(resolveVoiceModelById('grok-voice-latest').tier, 'standard');
+  assert.equal(resolveVoiceModelById('grok-voice-think-fast-1.0').tier, 'mini');
+  assert.equal(resolveVoiceModelById('grok-voice-latest').recognized, true);
 });
 
 test('F3: an unrecognised model id bills at the most expensive known rates', () => {
@@ -487,15 +487,15 @@ test('F3: the most expensive model is derived from the registry, not hardcoded',
 
 test('F3: modelId outranks tier when both are supplied', () => {
   // The env override case: tier says mini, the server actually served standard.
-  const tracker = createVoiceCostTracker({ tier: 'mini', modelId: 'gpt-realtime-2' });
-  assert.equal(tracker.state().modelId, 'gpt-realtime-2');
+  const tracker = createVoiceCostTracker({ tier: 'mini', modelId: 'grok-voice-latest' });
+  assert.equal(tracker.state().modelId, 'grok-voice-latest');
   assert.equal(tracker.state().tier, 'standard');
 });
 
 test('F3: pricing by tier alone would have under-metered an overridden session', () => {
   // Concrete statement of the bug: same usage, tier-priced vs actually-served.
   const byTier = createVoiceCostTracker({ tier: 'mini' });
-  const byModel = createVoiceCostTracker({ tier: 'mini', modelId: 'gpt-realtime-2' });
+  const byModel = createVoiceCostTracker({ tier: 'mini', modelId: 'grok-voice-latest' });
   const tierCost = byTier.record(FULL_USAGE).totalUsd;
   const realCost = byModel.record(FULL_USAGE).totalUsd;
   assert.ok(realCost > tierCost * 3, `real ${realCost} vs tier-assumed ${tierCost}`);

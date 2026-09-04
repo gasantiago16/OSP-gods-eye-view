@@ -67,7 +67,7 @@ Ordered by unique OSP value, not by how flashy they look on a globe GEV already 
 Out of scope until (1) works:
 
 - Rewriting GEV in React/TypeScript
-- Wiring Muse into `OPENAI_API_KEY` (Realtime is a different protocol)
+- Wiring Muse into `XAI_API_KEY` (different protocol). Voice/HUD use Graph Hockey’s SpaceXAI key.
 - Ships / CCTV / TomTom (GEV already has them; we have no extra signal)
 - Declaring L5 or "matches Falcon flight" on a browser overlay
 
