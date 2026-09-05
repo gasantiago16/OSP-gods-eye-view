@@ -166,9 +166,10 @@ test('quota exhaustion on the PNG route is not JSON', async () => {
     const miss = await invoke(proxy.middleware, `/tiles/1788563400/7/${i % 8}/${Math.floor(i / 8)}.png`);
     if (miss.status !== 200) break;
   }
-  const over = await invoke(proxy.middleware, '/tiles/1788564000/7/9/9.png');
-  assert.ok(over.status === 503 || over.headers['X-Radar-Cache'] === 'STALE');
+  const over = await invoke(proxy.middleware, '/tiles/1788564000/7/0/0.png');
+  assert.equal(over.status, 503);
   assert.equal(over.headers['Content-Type'], 'image/png');
+  assert.equal(over.headers['Cache-Control'], 'no-store');
   assert.equal(over.body.toString().includes('{'), false);
 });
 

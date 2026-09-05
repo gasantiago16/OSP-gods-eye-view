@@ -89,7 +89,12 @@ export function createRadarRenderer({
       layer.alpha = opacity;
       viewer.imageryLayers.add(layer);
       const incoming = { id, layer };
-      layers = [...layers.filter((entry) => entry.id !== id), incoming].slice(-2);
+      const next = [...layers.filter((entry) => entry.id !== id), incoming];
+      const kept = next.slice(-2);
+      for (const entry of layers) {
+        if (!kept.includes(entry)) removeLayer(entry, true);
+      }
+      layers = kept;
       if (epoch !== swapEpoch) return false;
       requestRender('weather-radar-frame');
       return true;

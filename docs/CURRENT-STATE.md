@@ -2249,7 +2249,7 @@ silently demoting every later lookup for the session.
 
 - Layer id `weather-radar`, share token `n` (absent means off). Default opacity 65%. FIRMS keeps token `w`.
 - Same-origin RainViewer proxy: `/api/weather-radar/catalog` and `/api/weather-radar/tiles/{frame}/{z}/{x}/{y}.png`. Universal Blue, max zoom 7, advertised frames only. No nowcast.
-- Enabling on Google Photoreal 3D switches to OSM terrain so the Cesium imagery layer is actually visible. A later photoreal choice suspends tiles (`TERRAIN MAP REQUIRED`) rather than painting a hidden globe. Cockpit suspends the overlay independently of the Open-Meteo cockpit shader.
+- Explicit user/voice/tool enable on Google Photoreal 3D switches to OSM terrain so the Cesium imagery layer is actually visible. Share/local restore does not steal the basemap; radar stays `TERRAIN MAP REQUIRED` until a terrain stack is chosen. A later photoreal choice suspends tiles. Cockpit suspends the overlay independently of the Open-Meteo cockpit shader.
 - Playback uses an owned clock. It does not touch `viewer.clock`.
 
 ### Not Currently in Runtime

@@ -184,10 +184,12 @@ function sendJson(res, status, body) {
 
 function sendPng(res, status, body, extraHeaders = {}) {
   if (res.headersSent) return;
+  const cacheControl = extraHeaders['Cache-Control']
+    || (status === 200 ? 'public, max-age=60' : 'no-store');
   res.writeHead(status, {
     'Content-Type': 'image/png',
-    'Cache-Control': status === 200 ? 'public, max-age=60' : 'no-store',
     ...extraHeaders,
+    'Cache-Control': cacheControl,
   });
   res.end(body);
 }
@@ -297,11 +299,13 @@ export function createWeatherRadarProxy({
 
     const stamp = now();
     if (!governor.tryAcquire(stamp)) {
-      const fallback = xyzLastGood.get(xyzKey(z, x, y));
-      if (fallback) return { status: 200, body: fallback, cache: 'STALE' };
       const error = new Error('RainViewer rate limited');
       error.status = 503;
       error.retryAfter = '2';
+      const fallback = xyzLastGood.get(xyzKey(z, x, y));
+      if (fallback) {
+        error.fallback = fallback;
+      }
       throw error;
     }
 
@@ -320,6 +324,9 @@ export function createWeatherRadarProxy({
       const buffer = Buffer.from(await response.arrayBuffer());
       tileCache.set(cacheKey, { body: buffer, bytes: buffer.byteLength, at: now() });
       xyzLastGood.set(xyzKey(z, x, y), buffer);
+      if (xyzLastGood.size > RADAR_TILE_CACHE_ENTRIES) {
+        xyzLastGood.delete(xyzLastGood.keys().next().value);
+      }
       return { status: 200, body: buffer, cache: 'MISS' };
     });
   }
@@ -353,16 +360,21 @@ export function createWeatherRadarProxy({
         return;
       }
       const tileResult = await proxyTile(frameMeta, tile.z, tile.x, tile.y);
+      const cacheHeaders = { 'X-Radar-Cache': tileResult.cache };
       if (method === 'HEAD') {
-        sendPng(res, 200, Buffer.alloc(0), { 'X-Radar-Cache': tileResult.cache });
+        sendPng(res, 200, Buffer.alloc(0), cacheHeaders);
         return;
       }
-      sendPng(res, 200, tileResult.body, { 'X-Radar-Cache': tileResult.cache });
+      sendPng(res, 200, tileResult.body, cacheHeaders);
     } catch (error) {
       if (isTileRoute(pathname)) {
         const status = Number(error?.status);
         const headers = {};
         if (error?.retryAfter) headers['Retry-After'] = String(error.retryAfter);
+        if (error?.fallback && method !== 'HEAD') {
+          sendPng(res, 503, error.fallback, { ...headers, 'X-Radar-Cache': 'STALE' });
+          return;
+        }
         sendPngStatus(res, status >= 400 && status < 600 ? status : 502, headers);
         return;
       }
