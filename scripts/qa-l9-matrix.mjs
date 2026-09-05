@@ -177,6 +177,7 @@ const CREDIT_EXPECTATIONS = {
   'local-dams': /OpenStreetMap/i,
   'local-firms': /FIRMS/i,
   'telegeography-submarine-cables': /TeleGeography/i,
+  'weather-radar': /RainViewer/i,
   'local-neighborhoods': /DataSF|San Francisco/i,
   'weather-effects': /Open-Meteo/i,
 };

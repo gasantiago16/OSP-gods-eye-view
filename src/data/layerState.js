@@ -241,6 +241,22 @@ const OPTION_GROUPS = Object.freeze({
       decode: (value) => (/^\d{1,3}$/.test(value) ? normalizeVolume(Number(value) / 100) : null),
     }),
   ]),
+  'weather-radar': Object.freeze([
+    Object.freeze({
+      key: 'opacity',
+      token: 'o',
+      defaultValue: 65,
+      normalize: (value) => {
+        const numeric = Number(value);
+        return [40, 65, 100].includes(numeric) ? numeric : null;
+      },
+      encode: (value) => String(value),
+      decode: (value) => {
+        const numeric = Number(value);
+        return [40, 65, 100].includes(numeric) ? numeric : null;
+      },
+    }),
+  ]),
 });
 
 const TRACKING_OPTION_KEY_BY_LAYER = Object.freeze({
@@ -291,6 +307,7 @@ export const LAYER_STATE_REGISTRY = Object.freeze([
   Object.freeze({ id: 'satellites', token: 's', disposition: 'enabled+options', optionOwner: 'satellites' }),
   Object.freeze({ id: 'telegeography-submarine-cables', token: 'u', disposition: 'enabled-only' }),
   Object.freeze({ id: 'traffic', token: 't', disposition: 'enabled-only' }),
+  Object.freeze({ id: 'weather-radar', token: 'n', disposition: 'enabled+options', optionOwner: 'weather-radar' }),
 ]);
 
 export const REGISTERED_LAYER_IDS = Object.freeze(LAYER_STATE_REGISTRY.map((entry) => entry.id));

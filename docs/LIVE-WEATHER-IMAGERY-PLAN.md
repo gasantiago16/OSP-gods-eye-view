@@ -3,9 +3,9 @@
 Date: 2026-09-04. Reviewed baseline: `55027ac0cfad2159dd9880f82b391a133cabddaf`
 on `gasantiago16/OSP-gods-eye-view/main`.
 
-Status: proposed implementation plan. This change adds documentation; satellite
-imagery, radar, and playback are not implemented by this commit. The existing
-runtime contract remains [CURRENT-STATE.md](CURRENT-STATE.md).
+Status: radar v1 shipped 2026-09-04 as `weather-radar` (RainViewer-first,
+terrain globe, owned playback clock). This document's satellite-first GIBS
+recommendation remains later work. The runtime contract is [CURRENT-STATE.md](CURRENT-STATE.md).
 
 ## Engineering opinion
 

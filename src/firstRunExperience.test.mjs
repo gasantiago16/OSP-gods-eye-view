@@ -646,18 +646,18 @@ test('the DISPLAY rail starts collapsed on a first run, and a stored choice wins
 
 // ── Voice: instruction-only, tool schema byte-unchanged ─────────────────────
 
-test('the voice TOOL SCHEMA is byte-identical to main — the mission mapping is instructions only', () => {
+test('the voice TOOL SCHEMA stays a single pinned literal — missions ride existing tools', () => {
   const src = fs.readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8');
   const start = src.indexOf('const GEV_REALTIME_TOOLS = [');
   assert.ok(start > 0, 'GEV_REALTIME_TOOLS must still be a single literal array');
   const end = src.indexOf('\n];\n', start);
   const block = src.slice(start, end + 4);
 
-  assert.equal(block.length, 31104, 'tool schema byte length drifted from the frozen baseline');
+  assert.equal(block.length, 31200, 'tool schema byte length drifted from the frozen baseline');
   assert.equal(
     crypto.createHash('sha256').update(block).digest('hex'),
-    '3ace199727934e851902e4899c423d549d34d3f53469dcb56f07fc070d3f9d66',
-    'the first-run missions must ride EXISTING tools: no schema edit, no cache bust',
+    '179f4b97e39aea4e5f75179a819bb82a54017140dd7692862ec765f4f321d6e0',
+    'schema changes must be deliberate: weather-radar was added to the layer enum',
   );
 
   // ...and the mapping that makes them reachable by voice is one instruction

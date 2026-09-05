@@ -3,6 +3,15 @@
 This changelog records public product changes. For the authoritative description
 of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
+## [Unreleased] — 2026-09-04
+
+### Added
+
+- Added a live RainViewer weather radar overlay (`weather-radar`). It drapes
+  Universal Blue composite reflectivity on OSM/Bing terrain, switches off
+  Google 3D so the layer is actually visible, and plays advertised past frames
+  without touching `viewer.clock`.
+
 ## [Unreleased] — 2026-08-24
 
 ### Added

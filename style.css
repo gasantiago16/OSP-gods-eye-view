@@ -5856,7 +5856,9 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 .data-toggle-btn.feed-degraded,
 .data-toggle-btn.feed-stale,
 .data-toggle-btn.feed-fallback,
-.data-toggle-btn.feed-unavailable {
+.data-toggle-btn.feed-unavailable,
+.data-toggle-btn.feed-terrain-required,
+.data-toggle-btn.feed-cockpit-suspended {
   min-width: 82px;
   letter-spacing: 0.8px;
 }

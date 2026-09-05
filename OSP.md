@@ -57,10 +57,10 @@ Port **4173** is intentional. OSP World Track owns **5173**.
 
 ## First features worth adding
 
-The [live weather imagery review and implementation plan](docs/LIVE-WEATHER-IMAGERY-PLAN.md)
-adds a separate weather workstream: satellite imagery on the terrain globe,
-then bounded playback and precipitation radar. It preserves the OSP physics
-and product split above; the document is a plan, not a shipped weather layer.
+Live RainViewer weather radar ships as the `weather-radar` layer (terrain globe,
+owned playback clock). The [live weather imagery plan](docs/LIVE-WEATHER-IMAGERY-PLAN.md)
+still describes later GIBS/nowCOAST satellite work. Weather display does not
+modify OSP trajectories.
 
 Ordered by unique OSP value, not by how flashy they look on a globe GEV already has.
 

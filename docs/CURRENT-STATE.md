@@ -70,9 +70,10 @@ Updated: August 24, 2026
 > shipped tools (`set_layer_visibility`'s enum already carries
 > `local-datacenters`, `local-dams`, `telegeography-submarine-cables`,
 > `local-firms`, `earthquakes`; `zoom_to_globe` supplies the camera), so
-> `GEV_REALTIME_TOOLS` is **byte-identical to `main`** and pinned by sha256 in
-> the unit suite. One instruction paragraph in `vite.config.js` teaches the
-> phrase mapping; deleting it is the complete rollback.
+> `set_layer_visibility` now also names `weather-radar`. First-run missions
+> still ride existing tools plus that layer enum; the schema hash is pinned
+> in the unit suite. One instruction paragraph in `vite.config.js` teaches the
+> phrase mapping.
 >
 > **ESC arbitration — three rules, do not collapse them into one.** (1) The
 > launcher **yields**: a MutationObserver watches `body` for the surfaces that
@@ -2244,9 +2245,17 @@ silently demoting every later lookup for the session.
 - `src/data/detectionDraw.js` performs the batched, DPI-crisp canvas drawing for tier-colored labels, corner brackets, callouts, and distance-scaled tracked boxes. Unit tests cover label measurement and draw geometry.
 - `src/data/trackedReadout.js` publishes a protected shared-host callout above tracked aircraft and satellites or selected mapped installations. It reads only each layer's cached display position—never a fresh entity position evaluation—preventing readout jitter against the rendered target. AIS selection remains in the vessel source's protected card path.
 
+### Live weather radar (2026-09-04)
+
+- Layer id `weather-radar`, share token `n` (absent means off). Default opacity 65%. FIRMS keeps token `w`.
+- Same-origin RainViewer proxy: `/api/weather-radar/catalog` and `/api/weather-radar/tiles/{frame}/{z}/{x}/{y}.png`. Universal Blue, max zoom 7, advertised frames only. No nowcast.
+- Enabling on Google Photoreal 3D switches to OSM terrain so the Cesium imagery layer is actually visible. A later photoreal choice suspends tiles (`TERRAIN MAP REQUIRED`) rather than painting a hidden globe. Cockpit suspends the overlay independently of the Open-Meteo cockpit shader.
+- Playback uses an owned clock. It does not touch `viewer.clock`.
+
 ### Not Currently in Runtime
 
-- Weather radar (removed before OSS v1 after QA; no reliable visible payoff)
+- NASA GIBS / NOAA nowCOAST satellite-first weather imagery (see `docs/LIVE-WEATHER-IMAGERY-PLAN.md`)
+- Google 3D weather compositing
 - General replay/timeline systems outside the Space Missions experience
 - LiDAR explorer and paired-point CCTV calibration experiments
 
