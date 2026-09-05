@@ -112,10 +112,13 @@ test('z=8 and unknown frame are 400; advertised tiles hit the allowlisted host o
 
   const zoom = await invoke(proxy.middleware, '/tiles/1788563400/8/0/0.png');
   assert.equal(zoom.status, 400);
+  assert.equal(zoom.headers['Content-Type'], 'image/png');
+  assert.equal(zoom.body.length, 0);
 
   const unknown = await invoke(proxy.middleware, '/tiles/1111111111/7/0/0.png');
   assert.equal(unknown.status, 400);
-  assert.match(unknown.body.toString(), /unknown radar frame/);
+  assert.equal(unknown.headers['Content-Type'], 'image/png');
+  assert.equal(unknown.body.toString().includes('{'), false);
 
   const ok = await invoke(proxy.middleware, '/tiles/1788563400/7/1/2.png');
   assert.equal(ok.status, 200);
@@ -125,7 +128,10 @@ test('z=8 and unknown frame are 400; advertised tiles hit the allowlisted host o
   const cached = await invoke(proxy.middleware, '/tiles/1788563400/7/1/2.png');
   assert.equal(cached.status, 200);
   assert.equal(cached.headers['X-Radar-Cache'], 'HIT');
-  assert.equal(calls.filter((url) => url.endsWith('.png')).length, 1);
+  assert.equal(
+    calls.filter((url) => url.includes('/v2/radar/7fe2a0a30bbf/256/7/1/2/')).length,
+    1,
+  );
 });
 
 test('4xx/5xx tiles are not stored in the image cache', async () => {
@@ -140,10 +146,58 @@ test('4xx/5xx tiles are not stored in the image cache', async () => {
   });
   const first = await invoke(proxy.middleware, '/tiles/1788563400/2/0/0.png');
   assert.equal(first.status, 502);
+  assert.equal(first.headers['Content-Type'], 'image/png');
   const second = await invoke(proxy.middleware, '/tiles/1788563400/2/0/0.png');
   assert.equal(second.status, 502);
   assert.equal(tileCalls, 2);
   assert.equal(proxy.inspect().tileCacheSize, 0);
+});
+
+test('quota exhaustion on the PNG route is not JSON', async () => {
+  const proxy = createWeatherRadarProxy({
+    now: () => 1_000,
+    fetchImpl: async (url) => {
+      if (String(url).includes('weather-maps.json')) return catalogFetch();
+      return new Response(PNG, { status: 200, headers: { 'Content-Type': 'image/png' } });
+    },
+  });
+  await invoke(proxy.middleware, '/catalog');
+  for (let i = 0; i < 100; i += 1) {
+    const miss = await invoke(proxy.middleware, `/tiles/1788563400/7/${i % 8}/${Math.floor(i / 8)}.png`);
+    if (miss.status !== 200) break;
+  }
+  const over = await invoke(proxy.middleware, '/tiles/1788563400/7/9/9.png');
+  assert.equal(over.status, 503);
+  assert.equal(over.headers['Content-Type'], 'image/png');
+  assert.equal(over.body.toString().includes('{'), false);
+});
+
+test('tile cache hits do not wait on a later catalog refresh', async () => {
+  let catalogCalls = 0;
+  let nowMs = 1_000;
+  const proxy = createWeatherRadarProxy({
+    now: () => nowMs,
+    catalogTtlMs: 30_000,
+    fetchImpl: async (url) => {
+      if (String(url).includes('weather-maps.json')) {
+        catalogCalls += 1;
+        if (catalogCalls === 1) return catalogFetch();
+        throw new Error('catalog down');
+      }
+      return new Response(PNG, { status: 200, headers: { 'Content-Type': 'image/png' } });
+    },
+  });
+  await invoke(proxy.middleware, '/catalog');
+  const miss = await invoke(proxy.middleware, '/tiles/1788563400/7/1/2.png');
+  assert.equal(miss.status, 200);
+  nowMs = 1_000 + 60_000;
+  const staleCatalog = await invoke(proxy.middleware, '/catalog');
+  assert.equal(staleCatalog.status, 200);
+  const before = catalogCalls;
+  const hit = await invoke(proxy.middleware, '/tiles/1788563400/7/1/2.png');
+  assert.equal(hit.status, 200);
+  assert.equal(hit.headers['X-Radar-Cache'], 'HIT');
+  assert.equal(catalogCalls, before);
 });
 
 test('missing catalog host is unavailable rather than a fabricated tile source', () => {

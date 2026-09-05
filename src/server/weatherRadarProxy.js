@@ -24,7 +24,7 @@ export const RADAR_TILE_OPTIONS = '1_0';
 export const RADAR_UPSTREAM_TIMEOUT_MS = 8_000;
 export const RADAR_MAX_CONCURRENT_TILES = 6;
 export const RADAR_UPSTREAM_PER_MINUTE = 100;
-export const RADAR_TILE_CACHE_ENTRIES = 128;
+export const RADAR_TILE_CACHE_ENTRIES = 2048;
 export const RADAR_TILE_CACHE_BYTES = 64 * 1024 * 1024;
 export const RADAR_CATALOG_TTL_MS = 30_000;
 
@@ -192,6 +192,14 @@ function sendPng(res, status, body, extraHeaders = {}) {
   res.end(body);
 }
 
+function sendPngStatus(res, status, extraHeaders = {}) {
+  sendPng(res, status, Buffer.alloc(0), extraHeaders);
+}
+
+function isTileRoute(pathname) {
+  return pathname.startsWith('/tiles/');
+}
+
 function normalizePathname(rawUrl) {
   const url = new URL(String(rawUrl || '/'), 'http://internal');
   let pathname = url.pathname || '/';
@@ -249,13 +257,14 @@ export function createWeatherRadarProxy({
 
   async function loadCatalog({ allowStale = true } = {}) {
     const current = now();
-    if (catalog && current - catalog.at < catalogTtlMs && !catalog.stale) return catalog;
+    if (catalog && current - catalog.at < catalogTtlMs) return catalog;
     if (catalogInflight) return catalogInflight;
     catalogInflight = fetchUpstreamCatalog()
       .catch((error) => {
         if (allowStale && catalog?.frames?.size) {
           catalog = {
             ...catalog,
+            at: now(),
             stale: true,
             publicCatalog: {
               ...catalog.publicCatalog,
@@ -272,15 +281,21 @@ export function createWeatherRadarProxy({
     return catalogInflight;
   }
 
-  async function proxyTile(frameMeta, z, x, y) {
+  function framesForTiles() {
+    return catalog?.frames?.size ? catalog : null;
+  }
+
+  async function proxyTile(frameMeta, z, x, y, { prefetch = false } = {}) {
     const cacheKey = `${frameMeta.path}:${z}:${x}:${y}`;
     const cached = tileCache.get(cacheKey);
     if (cached) return { status: 200, body: cached.body, cache: 'HIT' };
 
     const stamp = now();
     if (!governor.tryAcquire(stamp)) {
+      if (prefetch) return { status: 0, skipped: true };
       const error = new Error('RainViewer rate limited');
-      error.status = 429;
+      error.status = 503;
+      error.retryAfter = '2';
       throw error;
     }
 
@@ -302,6 +317,18 @@ export function createWeatherRadarProxy({
     });
   }
 
+  let prefetchCursor = 0;
+  function prefetchSiblingFrames(exceptId, z, x, y) {
+    if (!catalog?.frames) return;
+    const ids = [...catalog.frames.keys()].filter((id) => id !== exceptId);
+    if (!ids.length) return;
+    const id = ids[prefetchCursor % ids.length];
+    prefetchCursor += 1;
+    const meta = catalog.frames.get(id);
+    if (!meta) return;
+    void proxyTile(meta, z, x, y, { prefetch: true }).catch(() => {});
+  }
+
   async function middleware(req, res) {
     const method = String(req.method || 'GET').toUpperCase();
     if (method !== 'GET' && method !== 'HEAD') {
@@ -320,37 +347,33 @@ export function createWeatherRadarProxy({
         sendJson(res, 404, { error: 'Unknown weather-radar route' });
         return;
       }
-      if (tile.error === 'zoom') {
-        sendJson(res, 400, { error: `zoom ${tile.z} exceeds max ${MAX_RADAR_ZOOM}` });
-        return;
-      }
       if (tile.error) {
-        sendJson(res, 400, { error: `invalid radar tile ${tile.error}` });
+        sendPngStatus(res, 400);
         return;
       }
-      const loaded = await loadCatalog();
+      const loaded = framesForTiles() || await loadCatalog();
       const frameMeta = loaded.frames.get(tile.frame);
       if (!frameMeta) {
-        sendJson(res, 400, { error: 'unknown radar frame' });
+        sendPngStatus(res, 400);
         return;
       }
       const tileResult = await proxyTile(frameMeta, tile.z, tile.x, tile.y);
+      if (tileResult.cache === 'MISS') prefetchSiblingFrames(tile.frame, tile.z, tile.x, tile.y);
       if (method === 'HEAD') {
         sendPng(res, 200, Buffer.alloc(0), { 'X-Radar-Cache': tileResult.cache });
         return;
       }
       sendPng(res, 200, tileResult.body, { 'X-Radar-Cache': tileResult.cache });
     } catch (error) {
+      if (isTileRoute(pathname)) {
+        const status = Number(error?.status);
+        const headers = {};
+        if (error?.retryAfter) headers['Retry-After'] = String(error.retryAfter);
+        sendPngStatus(res, status >= 400 && status < 600 ? status : 502, headers);
+        return;
+      }
       const status = Number(error?.status);
-      if (status === 429) {
-        sendJson(res, 429, { error: 'Rate limit exceeded' });
-        return;
-      }
-      if (status === 400) {
-        sendJson(res, 400, { error: error.message || 'Bad radar request' });
-        return;
-      }
-      if (catalog?.publicCatalog && pathname === '/catalog') {
+      if (catalog?.publicCatalog && (pathname === '/catalog' || pathname === '/')) {
         sendJson(res, 200, catalog.publicCatalog);
         return;
       }

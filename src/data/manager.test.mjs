@@ -1833,6 +1833,7 @@ test('layer feed states distinguish unavailable, fallback, stale, and degraded c
   assert.equal(layerFeedState({ count: 5, lastUpdate: 1 }), 'nominal');
   assert.equal(layerFeedState({ status: 'terrain-required', lastUpdate: 1 }), 'terrain-required');
   assert.equal(layerFeedState({ status: 'cockpit-suspended', lastUpdate: 1 }), 'cockpit-suspended');
+  assert.equal(layerFeedState({ status: 'history', lastUpdate: 1 }), 'history');
 });
 
 test('layer metadata names degraded state instead of presenting an ordinary age', () => {

@@ -8,8 +8,10 @@
 export const MAX_RADAR_ZOOM = 7;
 export const FRAME_STALE_MS = 20 * 60 * 1000;
 export const PUBLIC_TILE_TEMPLATE = '/api/weather-radar/tiles/{frame}/{z}/{x}/{y}.png';
-export const RADAR_PLAYBACK_MS = 400;
+export const RADAR_PLAYBACK_MS = 1_500;
 export const RADAR_CATALOG_POLL_MS = 60_000;
+export const RADAR_OPACITY_PRESETS = Object.freeze([40, 65, 100]);
+export const RADAR_DEFAULT_OPACITY = 65;
 export const RADAR_PATH_PATTERN = /^\/v2\/radar\/[A-Za-z0-9_-]{1,64}$/;
 export const RADAR_FRAME_ID_PATTERN = /^\d{9,10}$/;
 

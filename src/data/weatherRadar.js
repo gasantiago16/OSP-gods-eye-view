@@ -15,13 +15,15 @@ import {
   nextPlaybackIndex,
   pickLatestFrame,
   RADAR_CATALOG_POLL_MS,
+  RADAR_DEFAULT_OPACITY,
+  RADAR_OPACITY_PRESETS,
   RADAR_PLAYBACK_MS,
 } from '../weather/timeline.js';
 import { governorRequestRender } from '../renderGovernor.js';
 
 export const WEATHER_RADAR_LAYER_ID = 'weather-radar';
-export const WEATHER_RADAR_OPACITY_PRESETS = Object.freeze([40, 65, 100]);
-export const WEATHER_RADAR_DEFAULT_OPACITY = 65;
+export const WEATHER_RADAR_OPACITY_PRESETS = RADAR_OPACITY_PRESETS;
+export const WEATHER_RADAR_DEFAULT_OPACITY = RADAR_DEFAULT_OPACITY;
 
 const CATALOG_URL = '/api/weather-radar/catalog';
 
@@ -103,8 +105,9 @@ export function createWeatherRadarLayer({
     if (catalogStatus === 'unavailable' && frames.length === 0) return 'unavailable';
     const current = frames.find((frame) => frame.id === currentId) || pickLatestFrame(frames);
     if (!current) return loading ? 'loading' : 'unavailable';
-    if (isFrameStale(current, now())) return 'stale';
     if (playing || !followLatest) return 'history';
+    const latest = pickLatestFrame(frames);
+    if (isFrameStale(latest, now())) return 'stale';
     return 'latest';
   }
 
@@ -154,17 +157,18 @@ export function createWeatherRadarLayer({
     } finally {
       radarSwitchPending = false;
     }
-    const landed = stackAllowsRadar(getActiveStackId());
-    ownsMapSwitch = landed && getActiveStackId() === 'osm';
-    return landed;
+    const landed = getActiveStackId() === 'osm';
+    ownsMapSwitch = landed;
+    return stackAllowsRadar(getActiveStackId());
   }
 
   async function restoreOwnedStack() {
     if (!ownsMapSwitch) return;
     const restoreTo = stackBeforeRadar;
+    const stillOnOwnedOsm = getActiveStackId() === 'osm';
     ownsMapSwitch = false;
     stackBeforeRadar = null;
-    if (!restoreTo || getActiveStackId() === restoreTo) return;
+    if (!stillOnOwnedOsm || !restoreTo || restoreTo === 'osm') return;
     if (typeof setMapStack === 'function') {
       radarSwitchPending = true;
       try { await setMapStack(restoreTo); } finally { radarSwitchPending = false; }
@@ -230,9 +234,9 @@ export function createWeatherRadarLayer({
   function onMapStackChanged(event) {
     if (!enabled) return;
     const activeId = event?.detail?.activeId || getActiveStackId();
+    if (!radarSwitchPending) ownsMapSwitch = false;
     if (radarSwitchPending) return;
     if (!stackAllowsRadar(activeId)) {
-      ownsMapSwitch = false;
       suspendImagery();
     } else if (frames.length) {
       void paintCurrent();
@@ -327,6 +331,7 @@ export function createWeatherRadarLayer({
       enabled = false;
       fetchEpoch += 1;
       catalogInflight = null;
+      loading = false;
       stopPlayback();
       radar.clear();
       unbindListeners();

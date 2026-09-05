@@ -17,6 +17,7 @@ const FEED_STATE_LABELS = Object.freeze({
   stale: 'STALE',
   fallback: 'FALLBACK',
   unavailable: 'UNAVAILABLE',
+  history: 'PLAYBACK',
   'terrain-required': 'MAP',
   'cockpit-suspended': 'COCKPIT',
 });
@@ -78,7 +79,9 @@ export function layerFeedState(stats = {}) {
   const hasExplicitFallback = typeof state.fallback === 'boolean';
   const hasPriorData = Number(state.count) > 0 || Boolean(state.lastUpdate);
   const presentedError = state.error || state.lastError || state.managerRefreshError;
-  if (status === 'terrain-required' || status === 'cockpit-suspended') return status;
+  if (status === 'terrain-required' || status === 'cockpit-suspended' || status === 'history') {
+    return status;
+  }
   if (['unavailable', 'offline', 'down', 'error'].includes(status)) return 'unavailable';
   if (
     (presentedError || state.unavailable === true || state.available === false)

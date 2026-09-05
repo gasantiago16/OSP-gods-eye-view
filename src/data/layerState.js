@@ -1,3 +1,5 @@
+import { RADAR_DEFAULT_OPACITY, RADAR_OPACITY_PRESETS } from '../weather/timeline.js';
+
 const VALID_DISPOSITIONS = new Set([
   'enabled-only',
   'enabled+options',
@@ -245,15 +247,15 @@ const OPTION_GROUPS = Object.freeze({
     Object.freeze({
       key: 'opacity',
       token: 'o',
-      defaultValue: 65,
+      defaultValue: RADAR_DEFAULT_OPACITY,
       normalize: (value) => {
         const numeric = Number(value);
-        return [40, 65, 100].includes(numeric) ? numeric : null;
+        return RADAR_OPACITY_PRESETS.includes(numeric) ? numeric : null;
       },
       encode: (value) => String(value),
       decode: (value) => {
         const numeric = Number(value);
-        return [40, 65, 100].includes(numeric) ? numeric : null;
+        return RADAR_OPACITY_PRESETS.includes(numeric) ? numeric : null;
       },
     }),
   ]),

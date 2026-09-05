@@ -142,6 +142,30 @@ test('a later photoreal choice suspends tiles instead of painting a hidden globe
   assert.equal(world.stacks.includes('photoreal'), false, 'radar no longer owns the stack');
 });
 
+test('a later Bing choice drops radar map ownership so disable does not restore photoreal', async () => {
+  const world = createLayer({ stackId: 'photoreal' });
+  world.layer.init({});
+  await world.layer.enable();
+  assert.deepEqual(world.stacks, ['osm']);
+  world.setStack('bing-aerial');
+  world.host.emit('gev:map-stack-changed', { activeId: 'bing-aerial' });
+  await world.layer.disable();
+  assert.deepEqual(world.stacks, ['osm']);
+});
+
+test('playback of older advertised frames is history, not a stale feed fault', async () => {
+  const world = createLayer({
+    now: () => FRAMES[2].validTime + 25 * 60_000,
+  });
+  world.layer.init({});
+  await world.layer.enable();
+  assert.equal(world.layer.getStats().status, 'stale');
+  world.layer.setParams({ playing: true });
+  assert.equal(world.layer.getStats().status, 'history');
+  assert.equal(layerFeedState(world.layer.getStats()), 'history');
+  await world.layer.disable();
+});
+
 test('enable/disable/re-enable destroys imagery and can fetch again', async () => {
   const world = createLayer();
   world.layer.init({});
