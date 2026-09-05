@@ -23,7 +23,7 @@ function fakeCesiumViewer() {
   };
 }
 
-test('showFrame removes Cesium layers that leave the two-layer window', async () => {
+test('showFrame keeps a single Cesium layer and removes the previous one', async () => {
   const world = fakeCesiumViewer();
   const renderer = createRadarRenderer({
     CesiumImpl: world.CesiumImpl,
@@ -33,11 +33,11 @@ test('showFrame removes Cesium layers that leave the two-layer window', async ()
   await renderer.showFrame('1');
   await renderer.showFrame('2');
   await renderer.showFrame('3');
-  assert.equal(renderer.layerCount(), 2);
+  assert.equal(renderer.layerCount(), 1);
   assert.equal(world.added.length, 3);
-  assert.equal(world.removed.length, 1);
+  assert.equal(world.removed.length, 2);
   await renderer.showFrame('1');
-  assert.equal(renderer.layerCount(), 2);
+  assert.equal(renderer.layerCount(), 1);
   renderer.clear();
   assert.equal(renderer.layerCount(), 0);
   assert.equal(world.added.length, world.removed.length);

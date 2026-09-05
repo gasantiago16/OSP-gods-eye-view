@@ -79,6 +79,7 @@ export function createWeatherRadarLayer({
   let ownsMapSwitch = false;
   let stackBeforeRadar = null;
   let radarSwitchPending = false;
+  let explicitIntent = false;
   let catalogInflight = null;
   let playbackTimer = null;
   let rowControlsListener = null;
@@ -266,7 +267,10 @@ export function createWeatherRadarLayer({
       notifyRow();
       return;
     }
-    void resumePaint();
+    void (async () => {
+      if (explicitIntent) await ensureTerrainGlobe('user');
+      await resumePaint();
+    })();
   }
 
   function onVisibility() {
@@ -322,6 +326,7 @@ export function createWeatherRadarLayer({
 
     async enable(_viewer, { origin = 'programmatic' } = {}) {
       enabled = true;
+      if (isExplicitRadarIntent(origin)) explicitIntent = true;
       cockpitActive = readCockpitActive(host);
       bindListeners();
       if (cockpitActive) {
@@ -348,6 +353,7 @@ export function createWeatherRadarLayer({
 
     async disable() {
       enabled = false;
+      explicitIntent = false;
       fetchEpoch += 1;
       catalogInflight = null;
       loading = false;

@@ -225,7 +225,6 @@ export function createWeatherRadarProxy({
   timeoutMs = RADAR_UPSTREAM_TIMEOUT_MS,
 } = {}) {
   const tileCache = createByteLru();
-  const xyzLastGood = new Map();
   const governor = createMinuteGovernor();
   const tileGate = createConcurrencyGate();
   /** @type {{ at: number, upstream: object, publicCatalog: object, frames: Map<string, object>, stale: boolean }|null} */
@@ -288,10 +287,6 @@ export function createWeatherRadarProxy({
     return catalog?.frames?.size ? catalog : null;
   }
 
-  function xyzKey(z, x, y) {
-    return `${z}:${x}:${y}`;
-  }
-
   async function proxyTile(frameMeta, z, x, y) {
     const cacheKey = `${frameMeta.path}:${z}:${x}:${y}`;
     const cached = tileCache.get(cacheKey);
@@ -302,10 +297,6 @@ export function createWeatherRadarProxy({
       const error = new Error('RainViewer rate limited');
       error.status = 503;
       error.retryAfter = '2';
-      const fallback = xyzLastGood.get(xyzKey(z, x, y));
-      if (fallback) {
-        error.fallback = fallback;
-      }
       throw error;
     }
 
@@ -323,10 +314,6 @@ export function createWeatherRadarProxy({
       }
       const buffer = Buffer.from(await response.arrayBuffer());
       tileCache.set(cacheKey, { body: buffer, bytes: buffer.byteLength, at: now() });
-      xyzLastGood.set(xyzKey(z, x, y), buffer);
-      if (xyzLastGood.size > RADAR_TILE_CACHE_ENTRIES) {
-        xyzLastGood.delete(xyzLastGood.keys().next().value);
-      }
       return { status: 200, body: buffer, cache: 'MISS' };
     });
   }
@@ -371,10 +358,6 @@ export function createWeatherRadarProxy({
         const status = Number(error?.status);
         const headers = {};
         if (error?.retryAfter) headers['Retry-After'] = String(error.retryAfter);
-        if (error?.fallback && method !== 'HEAD') {
-          sendPng(res, 503, error.fallback, { ...headers, 'X-Radar-Cache': 'STALE' });
-          return;
-        }
         sendPngStatus(res, status >= 400 && status < 600 ? status : 502, headers);
         return;
       }
