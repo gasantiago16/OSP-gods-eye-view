@@ -3,7 +3,7 @@
 // The scene director was written when the app shipped four data layers, and its
 // shot recipes (src/scenes/recipes.js) still declare exactly those four:
 // flights, satellites, earthquakes, traffic. The registry has since grown to
-// sixteen. The original reconcile walked the LIVE registry and forced every
+// seventeen. The original reconcile walked the LIVE registry and forced every
 // layer absent from the shot to off, so a recipe that never had an opinion
 // about CCTV, vessels, fires, radio, cables, dams or datacenters silently tore
 // them down — and nothing puts them back, because playback has no restore pass.
@@ -15,7 +15,7 @@
 // every authored intent intact while leaving undeclared layers alone.
 //
 // Operator-captured shots are unaffected: captureShot() snapshots the whole
-// registry (director._captureLayerStates), so those shots declare all sixteen
+// registry (director._captureLayerStates), so those shots declare all seventeen
 // keys and still reconcile in full.
 
 import { contextLayerEnableBlockReason } from '../contextModePolicy.js';

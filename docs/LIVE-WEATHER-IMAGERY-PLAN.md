@@ -109,10 +109,10 @@ configuration provider-specific. [Cesium WMTS reference](https://cesium.com/lear
 2. Keep an already compatible OSM/Bing stack. Otherwise choose OSM so weather
    adds no new key requirement. Retain camera position/orientation and snapshot
    the prior stack; require a successful, current switch before claiming success.
-3. An ordinary visibility toggle, restored state, or voice/tool call must not
-   silently switch the basemap. If it requests weather over Google 3D, show
-   `TERRAIN MAP REQUIRED` with the explicit Weather Map action. Do not report
-   imagery as visible while the globe is hidden.
+3. Share/local restore and other non-explicit origins must not switch the
+   basemap. Radar over Google 3D then shows `TERRAIN MAP REQUIRED`. An explicit
+   user/voice/tool enable on photoreal switches to OSM so the overlay is
+   visible. Do not report imagery as visible while the globe is hidden.
 4. Listen to `gev:map-stack-changed`. Suspend imagery requests/rendering on an
    incompatible stack. Respect the controller's switch generation so a late
    completion cannot undo a newer user choice.

@@ -121,7 +121,7 @@ test('radar stays off until enable and then paints the latest advertised frame',
 test('enable on photoreal switches to OSM and disable restores it', async () => {
   const world = createLayer({ stackId: 'photoreal' });
   world.layer.init({});
-  await world.layer.enable();
+  await world.layer.enable({}, { origin: 'user' });
   assert.deepEqual(world.stacks, ['osm']);
   assert.equal(world.getStack(), 'osm');
   assert.equal(world.renderer.shown.at(-1), '1788564600');
@@ -142,10 +142,20 @@ test('a later photoreal choice suspends tiles instead of painting a hidden globe
   assert.equal(world.stacks.includes('photoreal'), false, 'radar no longer owns the stack');
 });
 
+test('share restore on photoreal does not steal the basemap', async () => {
+  const world = createLayer({ stackId: 'photoreal' });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'share-restore' });
+  assert.deepEqual(world.stacks, []);
+  assert.equal(world.layer.getStats().status, 'terrain-required');
+  await world.layer.disable();
+  assert.deepEqual(world.stacks, []);
+});
+
 test('a later Bing choice drops radar map ownership so disable does not restore photoreal', async () => {
   const world = createLayer({ stackId: 'photoreal' });
   world.layer.init({});
-  await world.layer.enable();
+  await world.layer.enable({}, { origin: 'user' });
   assert.deepEqual(world.stacks, ['osm']);
   world.setStack('bing-aerial');
   world.host.emit('gev:map-stack-changed', { activeId: 'bing-aerial' });

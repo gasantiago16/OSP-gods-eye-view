@@ -223,6 +223,7 @@ export function createWeatherRadarProxy({
   timeoutMs = RADAR_UPSTREAM_TIMEOUT_MS,
 } = {}) {
   const tileCache = createByteLru();
+  const xyzLastGood = new Map();
   const governor = createMinuteGovernor();
   const tileGate = createConcurrencyGate();
   /** @type {{ at: number, upstream: object, publicCatalog: object, frames: Map<string, object>, stale: boolean }|null} */
@@ -285,14 +286,19 @@ export function createWeatherRadarProxy({
     return catalog?.frames?.size ? catalog : null;
   }
 
-  async function proxyTile(frameMeta, z, x, y, { prefetch = false } = {}) {
+  function xyzKey(z, x, y) {
+    return `${z}:${x}:${y}`;
+  }
+
+  async function proxyTile(frameMeta, z, x, y) {
     const cacheKey = `${frameMeta.path}:${z}:${x}:${y}`;
     const cached = tileCache.get(cacheKey);
     if (cached) return { status: 200, body: cached.body, cache: 'HIT' };
 
     const stamp = now();
     if (!governor.tryAcquire(stamp)) {
-      if (prefetch) return { status: 0, skipped: true };
+      const fallback = xyzLastGood.get(xyzKey(z, x, y));
+      if (fallback) return { status: 200, body: fallback, cache: 'STALE' };
       const error = new Error('RainViewer rate limited');
       error.status = 503;
       error.retryAfter = '2';
@@ -313,20 +319,9 @@ export function createWeatherRadarProxy({
       }
       const buffer = Buffer.from(await response.arrayBuffer());
       tileCache.set(cacheKey, { body: buffer, bytes: buffer.byteLength, at: now() });
+      xyzLastGood.set(xyzKey(z, x, y), buffer);
       return { status: 200, body: buffer, cache: 'MISS' };
     });
-  }
-
-  let prefetchCursor = 0;
-  function prefetchSiblingFrames(exceptId, z, x, y) {
-    if (!catalog?.frames) return;
-    const ids = [...catalog.frames.keys()].filter((id) => id !== exceptId);
-    if (!ids.length) return;
-    const id = ids[prefetchCursor % ids.length];
-    prefetchCursor += 1;
-    const meta = catalog.frames.get(id);
-    if (!meta) return;
-    void proxyTile(meta, z, x, y, { prefetch: true }).catch(() => {});
   }
 
   async function middleware(req, res) {
@@ -358,7 +353,6 @@ export function createWeatherRadarProxy({
         return;
       }
       const tileResult = await proxyTile(frameMeta, tile.z, tile.x, tile.y);
-      if (tileResult.cache === 'MISS') prefetchSiblingFrames(tile.frame, tile.z, tile.x, tile.y);
       if (method === 'HEAD') {
         sendPng(res, 200, Buffer.alloc(0), { 'X-Radar-Cache': tileResult.cache });
         return;

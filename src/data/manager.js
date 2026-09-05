@@ -70,7 +70,7 @@ function refreshFailureFromStats(stats, label) {
 /**
  * Normalize heterogeneous layer stats into one honest control-chip state.
  * @param {object|null} stats Layer getStats() result.
- * @returns {'nominal'|'loading'|'degraded'|'stale'|'fallback'|'unavailable'|'terrain-required'|'cockpit-suspended'} Feed state.
+ * @returns {'nominal'|'loading'|'degraded'|'stale'|'fallback'|'unavailable'|'history'|'terrain-required'|'cockpit-suspended'} Feed state.
  */
 export function layerFeedState(stats = {}) {
   const state = stats || {};
@@ -898,7 +898,7 @@ export class DataLayerManager {
       entry.lifecycleUncertain = false;
       this._setVisibilityIntentPhase(entry, intentEpoch, 'enable');
       try {
-        const enabled = await entry.module.enable(this.viewer, { signal });
+        const enabled = await entry.module.enable(this.viewer, { signal, origin });
         if (enabled === false) throw lifecycleRejectedError(layerId, 'enable');
       } catch (e) {
         if (signal?.aborted || isAbortError(e)) {

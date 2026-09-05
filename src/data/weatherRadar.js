@@ -37,6 +37,10 @@ function stackAllowsRadar(stackId) {
   return Boolean(stackId) && stackId !== 'photoreal';
 }
 
+function isExplicitRadarIntent(origin) {
+  return origin === 'user' || origin === 'voice' || origin === 'tool';
+}
+
 function readCockpitActive(host) {
   const doc = host?.document;
   return Boolean(doc?.body?.classList?.contains('cockpit-mode'));
@@ -146,10 +150,10 @@ export function createWeatherRadarLayer({
     }, playbackMs);
   }
 
-  async function ensureTerrainGlobe() {
+  async function ensureTerrainGlobe(origin) {
     const active = getActiveStackId();
     if (stackAllowsRadar(active)) return true;
-    if (typeof setMapStack !== 'function') return false;
+    if (!isExplicitRadarIntent(origin) || typeof setMapStack !== 'function') return false;
     stackBeforeRadar = active;
     radarSwitchPending = true;
     try {
@@ -177,8 +181,8 @@ export function createWeatherRadarLayer({
 
   async function refreshCatalog() {
     if (readHidden(host)) return false;
-    const epoch = ++fetchEpoch;
     if (catalogInflight) return catalogInflight;
+    const epoch = ++fetchEpoch;
     loading = true;
     lastError = null;
     const work = (async () => {
@@ -307,11 +311,11 @@ export function createWeatherRadarLayer({
       cockpitActive = readCockpitActive(host);
     },
 
-    async enable() {
+    async enable(_viewer, { origin = 'programmatic' } = {}) {
       enabled = true;
       cockpitActive = readCockpitActive(host);
       bindListeners();
-      const terrainOk = await ensureTerrainGlobe();
+      const terrainOk = await ensureTerrainGlobe(origin);
       if (!enabled) return false;
       if (!terrainOk || cockpitActive) {
         suspendImagery();

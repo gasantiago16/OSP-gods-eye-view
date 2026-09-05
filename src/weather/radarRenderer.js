@@ -27,7 +27,7 @@ export function createRadarRenderer({
   let swapEpoch = 0;
 
   function currentId() {
-    return layers[0]?.id || null;
+    return layers[layers.length - 1]?.id || null;
   }
 
   function removeLayer(entry, destroy = true) {
@@ -37,16 +37,6 @@ export function createRadarRenderer({
     } catch {
       // Layer may already have been removed by a map-stack swap.
     }
-  }
-
-  function pruneTo(keep) {
-    const kept = new Set(keep);
-    const next = [];
-    for (const entry of layers) {
-      if (kept.has(entry)) next.push(entry);
-      else removeLayer(entry, true);
-    }
-    layers = next;
   }
 
   return {
@@ -100,13 +90,7 @@ export function createRadarRenderer({
       viewer.imageryLayers.add(layer);
       const incoming = { id, layer };
       layers = [...layers.filter((entry) => entry.id !== id), incoming].slice(-2);
-
-      const ready = provider.readyPromise || layer.readyPromise;
-      if (ready && typeof ready.then === 'function') {
-        try { await ready; } catch { /* keep the swap even if one tile 404s */ }
-      }
       if (epoch !== swapEpoch) return false;
-      pruneTo([incoming]);
       requestRender('weather-radar-frame');
       return true;
     },
