@@ -1,7 +1,8 @@
 > **OSP private riff** — [`gasantiago16/OSP-gods-eye-view`](https://github.com/gasantiago16/OSP-gods-eye-view)
 > Upstream: [`bilawalsidhu/gods-eye-view`](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © 2026 Bilawal Sidhu).
 > This is not an upstream GitHub fork. Product split, first features, Windows run: **[OSP.md](OSP.md)**.
-> Local: `http://127.0.0.1:4173` via `.\scripts\dev-windows.ps1` (port 5173 is OSP World Track).
+> Local: `http://localhost:4173` via `.\scripts\dev-windows.ps1` (port 5173 is OSP World Track).
+> Weather roadmap: [engineering review and live imagery plan](docs/LIVE-WEATHER-IMAGERY-PLAN.md).
 
 <div align="center">
 

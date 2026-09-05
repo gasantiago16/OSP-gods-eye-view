@@ -57,6 +57,11 @@ Port **4173** is intentional. OSP World Track owns **5173**.
 
 ## First features worth adding
 
+The [live weather imagery review and implementation plan](docs/LIVE-WEATHER-IMAGERY-PLAN.md)
+adds a separate weather workstream: satellite imagery on the terrain globe,
+then bounded playback and precipitation radar. It preserves the OSP physics
+and product split above; the document is a plan, not a shipped weather layer.
+
 Ordered by unique OSP value, not by how flashy they look on a globe GEV already has.
 
 1. **`osp-twins` layer** — load an OSP artifact (CSV/JSON from `artifacts/` or a small exporter) as a Cesium polyline + vehicle. Label it `OSP ECI TRUTH`. First target: Falcon 9 circular-LEO demo, then Boca→Maui PTP. This is the honest replacement for GEV's cinematic launch replay *when we have a twin*.
