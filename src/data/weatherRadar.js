@@ -134,6 +134,16 @@ export function createWeatherRadarLayer({
     requestRender('weather-radar-suspend');
   }
 
+  async function resumePaint() {
+    if (!enabled || !canPaint()) return false;
+    if (frames.length === 0) await refreshCatalog();
+    if (!enabled || !canPaint()) return false;
+    const painted = currentId ? await paintCurrent() : false;
+    if (playing) schedulePlayback();
+    notifyRow();
+    return painted;
+  }
+
   function schedulePlayback() {
     stopPlayback();
     if (!playing || !canPaint() || frames.length === 0) return;
@@ -242,22 +252,21 @@ export function createWeatherRadarLayer({
     if (radarSwitchPending) return;
     if (!stackAllowsRadar(activeId)) {
       suspendImagery();
-    } else if (frames.length) {
-      void paintCurrent();
-      if (playing) schedulePlayback();
+      notifyRow();
+      return;
     }
-    notifyRow();
+    void resumePaint();
   }
 
   function onCockpitMode(event) {
     cockpitActive = event?.detail?.active === true || readCockpitActive(host);
     if (!enabled) return;
-    if (cockpitActive) suspendImagery();
-    else {
-      void paintCurrent();
-      if (playing) schedulePlayback();
+    if (cockpitActive) {
+      suspendImagery();
+      notifyRow();
+      return;
     }
-    notifyRow();
+    void resumePaint();
   }
 
   function onVisibility() {
@@ -315,15 +324,21 @@ export function createWeatherRadarLayer({
       enabled = true;
       cockpitActive = readCockpitActive(host);
       bindListeners();
+      if (cockpitActive) {
+        suspendImagery();
+        await refreshCatalog();
+        notifyRow();
+        return true;
+      }
       const terrainOk = await ensureTerrainGlobe(origin);
       if (!enabled) return false;
-      if (!terrainOk || cockpitActive) {
+      const ok = await refreshCatalog();
+      if (!enabled) return false;
+      if (!terrainOk) {
         suspendImagery();
         notifyRow();
         return true;
       }
-      const ok = await refreshCatalog();
-      if (!enabled) return false;
       if (ok) await paintCurrent();
       if (playing) schedulePlayback();
       notifyRow();

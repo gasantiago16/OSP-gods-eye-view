@@ -148,8 +148,31 @@ test('share restore on photoreal does not steal the basemap', async () => {
   await world.layer.enable({}, { origin: 'share-restore' });
   assert.deepEqual(world.stacks, []);
   assert.equal(world.layer.getStats().status, 'terrain-required');
+  assert.ok(world.fetches.length > 0, 'catalog still loads while suspended');
+  const painted = new Promise((resolve) => {
+    const inner = world.renderer.showFrame.bind(world.renderer);
+    world.renderer.showFrame = async (id) => {
+      const result = await inner(id);
+      resolve(id);
+      return result;
+    };
+  });
+  world.setStack('osm');
+  world.host.emit('gev:map-stack-changed', { activeId: 'osm' });
+  assert.equal(await painted, '1788564600');
   await world.layer.disable();
   assert.deepEqual(world.stacks, []);
+});
+
+test('cockpit enable does not switch the basemap', async () => {
+  const host = createHost();
+  host.document.body.classList.contains = () => true;
+  const world = createLayer({ stackId: 'photoreal', host });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.deepEqual(world.stacks, []);
+  assert.equal(world.layer.getStats().status, 'cockpit-suspended');
+  assert.ok(world.fetches.length > 0);
 });
 
 test('a later Bing choice drops radar map ownership so disable does not restore photoreal', async () => {
