@@ -265,3 +265,20 @@ test('manager can register and destroy the radar layer', async () => {
   await manager.destroyLayer('weather-radar');
   assert.equal(manager.layers.has('weather-radar'), false);
 });
+
+test('manager enable stays ON when the catalog is unavailable', async () => {
+  const world = createLayer({
+    fetchImpl: async () => jsonResponse(catalogPayload({ frames: [], catalogStatus: 'unavailable' })),
+  });
+  const manager = new DataLayerManager({});
+  manager.register(world.layer);
+  const changes = [];
+  manager.subscribe((change) => changes.push(change.type));
+  assert.equal(await manager.setEnabled('weather-radar', true, { origin: 'user' }), true);
+  assert.equal(manager.isEnabled('weather-radar'), true);
+  assert.equal(world.layer.getStats().status, 'unavailable');
+  assert.equal(changes.includes('visibility-failed'), false);
+  await world.layer.disable();
+  assert.equal(world.layer.getStats().countLabel, '');
+  await manager.destroyLayer('weather-radar');
+});

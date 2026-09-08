@@ -357,6 +357,12 @@ export function createWeatherRadarLayer({
       fetchEpoch += 1;
       catalogInflight = null;
       loading = false;
+      frames = [];
+      currentId = null;
+      catalogStatus = 'idle';
+      lastError = null;
+      lastUpdate = null;
+      retrievedAt = null;
       stopPlayback();
       radar.clear();
       unbindListeners();
@@ -372,7 +378,7 @@ export function createWeatherRadarLayer({
       const ok = await refreshCatalog();
       if (ok && canPaint()) await paintCurrent();
       notifyRow();
-      return catalogStatus !== 'unavailable' || frames.length > 0;
+      return true;
     },
 
     async destroy() {
@@ -491,7 +497,7 @@ export function createWeatherRadarLayer({
       if (validZ) source = `${source} · ${validZ}`;
       return {
         count: frames.length,
-        countLabel: formatFrameAge(ageMs),
+        countLabel: status === 'off' ? '' : formatFrameAge(ageMs),
         lastUpdate,
         loading,
         stale: status === 'stale',
