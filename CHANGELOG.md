@@ -8,15 +8,19 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 ### Added
 
 - Added a live RainViewer weather radar overlay (`weather-radar`). It drapes
-  Universal Blue composite reflectivity on OSM/Bing terrain, switches off
-  Google 3D so the layer is actually visible, and plays advertised past frames
-  without touching `viewer.clock`.
+  Universal Blue composite reflectivity on OSM/Bing terrain. Explicit
+  user/voice/tool enable switches Google 3D to OSM so the layer is actually
+  visible; share/local restore does not steal the basemap. Advertised past
+  frames play without touching `viewer.clock`.
 
 ### Fixed
 
 - Weather radar no longer switches the globe back to OSM on cockpit exit after
   the operator chose Photoreal 3D. Disabling the layer resets PLAY so the next
   enable is LATEST.
+- PLAY keeps the last-good radar frame on the globe until the next frame has a
+  real tile, instead of flashing empty OSM as "no rain." Identical in-flight
+  tile URLs share one upstream fetch.
 
 ## [Unreleased] — 2026-08-24
 

@@ -201,6 +201,33 @@ test('tile cache hits do not wait on a later catalog refresh', async () => {
   assert.equal(catalogCalls, before);
 });
 
+test('identical in-flight tile keys share one upstream fetch', async () => {
+  let tileCalls = 0;
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const proxy = createWeatherRadarProxy({
+    now: () => 1_000,
+    fetchImpl: async (url) => {
+      if (String(url).includes('weather-maps.json')) return catalogFetch();
+      tileCalls += 1;
+      await gate;
+      return new Response(PNG, { status: 200, headers: { 'Content-Type': 'image/png' } });
+    },
+  });
+  await invoke(proxy.middleware, '/catalog');
+  const pending = [
+    invoke(proxy.middleware, '/tiles/1788563400/7/1/2.png'),
+    invoke(proxy.middleware, '/tiles/1788563400/7/1/2.png'),
+    invoke(proxy.middleware, '/tiles/1788563400/7/1/2.png'),
+  ];
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(tileCalls, 1);
+  release();
+  const results = await Promise.all(pending);
+  assert.ok(results.every((result) => result.status === 200));
+  assert.equal(tileCalls, 1);
+});
+
 test('missing catalog host is unavailable rather than a fabricated tile source', () => {
   const published = buildPublicCatalog({
     host: 'http://tilecache.rainviewer.com',

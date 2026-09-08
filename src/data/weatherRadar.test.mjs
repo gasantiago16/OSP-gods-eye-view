@@ -234,6 +234,27 @@ test('cockpit exit does not steal a later photoreal choice', async () => {
   assert.equal(world.renderer.shown.length, 0);
 });
 
+test('PLAY does not advance the timestamp when the next frame does not paint', async () => {
+  const queued = [];
+  const host = createHost();
+  host.setTimeout = (fn) => { queued.push(fn); return queued.length; };
+  host.clearTimeout = () => { queued.length = 0; };
+  const world = createLayer({ host });
+  const inner = world.renderer.showFrame.bind(world.renderer);
+  world.renderer.showFrame = async (id) => {
+    if (id === '1788563400') return false;
+    return inner(id);
+  };
+  world.layer.init({});
+  await world.layer.enable();
+  assert.equal(world.layer.getStats().frameId, '1788564600');
+  assert.equal(world.layer.setParams({ playing: true }), true);
+  queued.shift()();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(world.layer.getStats().frameId, '1788564600');
+  assert.equal(world.layer.getParams().followLatest, false);
+});
+
 test('disable then enable does not resume PLAY', async () => {
   const queued = [];
   const host = createHost();

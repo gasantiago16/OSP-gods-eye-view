@@ -158,12 +158,17 @@ export function createWeatherRadarLayer({
       playbackTimer = null;
       const next = nextPlaybackIndex(frames, currentId);
       if (next < 0) return;
-      followLatest = false;
-      currentId = frames[next].id;
-      void paintCurrent().then(() => {
+      const nextId = frames[next].id;
+      void (async () => {
+        radar.setOpacity(opacityPercent / 100);
+        const painted = await radar.showFrame(nextId);
+        if (painted && enabled) {
+          followLatest = false;
+          currentId = nextId;
+        }
         if (playing && enabled) schedulePlayback();
         notifyRow();
-      });
+      })();
     }, playbackMs);
   }
 

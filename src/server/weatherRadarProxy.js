@@ -227,6 +227,8 @@ export function createWeatherRadarProxy({
   const tileCache = createByteLru();
   const governor = createMinuteGovernor();
   const tileGate = createConcurrencyGate();
+  /** @type {Map<string, Promise<{ status: number, body: Buffer, cache: string }>>} */
+  const inflightTiles = new Map();
   /** @type {{ at: number, upstream: object, publicCatalog: object, frames: Map<string, object>, stale: boolean }|null} */
   let catalog = null;
   let catalogInflight = null;
@@ -292,30 +294,40 @@ export function createWeatherRadarProxy({
     const cached = tileCache.get(cacheKey);
     if (cached) return { status: 200, body: cached.body, cache: 'HIT' };
 
-    const stamp = now();
-    if (!governor.tryAcquire(stamp)) {
-      const error = new Error('RainViewer rate limited');
-      error.status = 503;
-      error.retryAfter = '2';
-      throw error;
-    }
+    const existing = inflightTiles.get(cacheKey);
+    if (existing) return existing;
 
-    return tileGate(async () => {
-      const again = tileCache.get(cacheKey);
-      if (again) return { status: 200, body: again.body, cache: 'HIT' };
-      const upstreamUrl = radarTileUpstreamUrl(frameMeta.host, frameMeta.path, z, x, y);
-      const signal = makeSignal(timeoutMs);
-      const response = await fetchImpl(upstreamUrl, signal ? { signal } : {});
-      if (!response.ok) {
-        const error = new Error(`RainViewer tile HTTP ${response.status}`);
-        error.status = response.status >= 500 ? 502 : response.status;
-        error.retryable = false;
+    const work = (async () => {
+      const stamp = now();
+      if (!governor.tryAcquire(stamp)) {
+        const error = new Error('RainViewer rate limited');
+        error.status = 503;
+        error.retryAfter = '2';
         throw error;
       }
-      const buffer = Buffer.from(await response.arrayBuffer());
-      tileCache.set(cacheKey, { body: buffer, bytes: buffer.byteLength, at: now() });
-      return { status: 200, body: buffer, cache: 'MISS' };
-    });
+      return tileGate(async () => {
+        const again = tileCache.get(cacheKey);
+        if (again) return { status: 200, body: again.body, cache: 'HIT' };
+        const upstreamUrl = radarTileUpstreamUrl(frameMeta.host, frameMeta.path, z, x, y);
+        const signal = makeSignal(timeoutMs);
+        const response = await fetchImpl(upstreamUrl, signal ? { signal } : {});
+        if (!response.ok) {
+          const error = new Error(`RainViewer tile HTTP ${response.status}`);
+          error.status = response.status >= 500 ? 502 : response.status;
+          error.retryable = false;
+          throw error;
+        }
+        const buffer = Buffer.from(await response.arrayBuffer());
+        tileCache.set(cacheKey, { body: buffer, bytes: buffer.byteLength, at: now() });
+        return { status: 200, body: buffer, cache: 'MISS' };
+      });
+    })();
+    inflightTiles.set(cacheKey, work);
+    try {
+      return await work;
+    } finally {
+      if (inflightTiles.get(cacheKey) === work) inflightTiles.delete(cacheKey);
+    }
   }
 
   async function middleware(req, res) {
