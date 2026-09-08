@@ -12,6 +12,12 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
   Google 3D so the layer is actually visible, and plays advertised past frames
   without touching `viewer.clock`.
 
+### Fixed
+
+- Weather radar no longer switches the globe back to OSM on cockpit exit after
+  the operator chose Photoreal 3D. Disabling the layer resets PLAY so the next
+  enable is LATEST.
+
 ## [Unreleased] — 2026-08-24
 
 ### Added

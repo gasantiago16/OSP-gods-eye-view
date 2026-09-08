@@ -175,6 +175,91 @@ test('cockpit enable does not switch the basemap', async () => {
   assert.ok(world.fetches.length > 0);
 });
 
+test('cockpit exit still switches photoreal after an explicit enable deferred in cockpit', async () => {
+  const host = createHost();
+  host.document.body.classList.contains = (name) => name === 'cockpit-mode';
+  const world = createLayer({ stackId: 'photoreal', host });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.deepEqual(world.stacks, []);
+  const painted = new Promise((resolve) => {
+    const inner = world.renderer.showFrame.bind(world.renderer);
+    world.renderer.showFrame = async (id) => {
+      const result = await inner(id);
+      resolve(id);
+      return result;
+    };
+  });
+  host.document.body.classList.contains = () => false;
+  world.host.emit('gev:cockpit-mode-changed', { active: false });
+  assert.equal(await painted, '1788564600');
+  assert.deepEqual(world.stacks, ['osm']);
+  assert.equal(world.getStack(), 'osm');
+  assert.equal(world.layer.getStats().status, 'latest');
+});
+
+test('map choice while cockpit is on drops the deferred OSM switch', async () => {
+  const host = createHost();
+  host.document.body.classList.contains = (name) => name === 'cockpit-mode';
+  const world = createLayer({ stackId: 'photoreal', host });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.deepEqual(world.stacks, []);
+  world.host.emit('gev:map-stack-changed', { activeId: 'photoreal' });
+  host.document.body.classList.contains = () => false;
+  world.host.emit('gev:cockpit-mode-changed', { active: false });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(world.getStack(), 'photoreal');
+  assert.deepEqual(world.stacks, []);
+  assert.equal(world.layer.getStats().status, 'terrain-required');
+});
+
+test('cockpit exit does not steal a later photoreal choice', async () => {
+  const world = createLayer({ stackId: 'photoreal' });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.deepEqual(world.stacks, ['osm']);
+  world.setStack('photoreal');
+  world.host.emit('gev:map-stack-changed', { activeId: 'photoreal' });
+  assert.equal(world.layer.getStats().status, 'terrain-required');
+  world.host.document.body.classList.contains = (name) => name === 'cockpit-mode';
+  world.host.emit('gev:cockpit-mode-changed', { active: true });
+  assert.equal(world.layer.getStats().status, 'cockpit-suspended');
+  world.host.document.body.classList.contains = () => false;
+  world.host.emit('gev:cockpit-mode-changed', { active: false });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(world.getStack(), 'photoreal');
+  assert.deepEqual(world.stacks, ['osm']);
+  assert.equal(world.layer.getStats().status, 'terrain-required');
+  assert.equal(world.renderer.shown.length, 0);
+});
+
+test('disable then enable does not resume PLAY', async () => {
+  const queued = [];
+  const host = createHost();
+  host.setTimeout = (fn) => { queued.push(fn); return queued.length; };
+  host.clearTimeout = () => { queued.length = 0; };
+  const world = createLayer({ host });
+  world.layer.init({});
+  await world.layer.enable();
+  assert.equal(world.layer.setParams({ playing: true }), true);
+  assert.equal(world.layer.getParams().playing, true);
+  assert.equal(world.layer.getParams().followLatest, false);
+  assert.equal(queued.length, 1);
+  await world.layer.disable();
+  assert.equal(world.layer.getParams().playing, false);
+  assert.equal(world.layer.getParams().followLatest, true);
+  queued.length = 0;
+  await world.layer.enable();
+  assert.equal(world.layer.getParams().playing, false);
+  assert.equal(world.layer.getParams().followLatest, true);
+  assert.equal(world.layer.getStats().status, 'latest');
+  assert.equal(queued.length, 0);
+  const chips = world.layer.getRowControls().chips;
+  assert.equal(chips.find((chip) => chip.id === 'play').active, false);
+  assert.equal(chips.find((chip) => chip.id === 'latest').active, true);
+});
+
 test('a later Bing choice drops radar map ownership so disable does not restore photoreal', async () => {
   const world = createLayer({ stackId: 'photoreal' });
   world.layer.init({});

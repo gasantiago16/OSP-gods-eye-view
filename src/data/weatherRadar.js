@@ -79,7 +79,7 @@ export function createWeatherRadarLayer({
   let ownsMapSwitch = false;
   let stackBeforeRadar = null;
   let radarSwitchPending = false;
-  let explicitIntent = false;
+  let deferredTerrainSwitch = false;
   let catalogInflight = null;
   let playbackTimer = null;
   let rowControlsListener = null;
@@ -100,6 +100,12 @@ export function createWeatherRadarLayer({
       timers.clearTimeout(playbackTimer);
       playbackTimer = null;
     }
+  }
+
+  function resetPlaybackMode() {
+    stopPlayback();
+    playing = false;
+    followLatest = true;
   }
 
   function presentationStatus() {
@@ -249,7 +255,10 @@ export function createWeatherRadarLayer({
   function onMapStackChanged(event) {
     if (!enabled) return;
     const activeId = event?.detail?.activeId || getActiveStackId();
-    if (!radarSwitchPending) ownsMapSwitch = false;
+    if (!radarSwitchPending) {
+      ownsMapSwitch = false;
+      deferredTerrainSwitch = false;
+    }
     if (radarSwitchPending) return;
     if (!stackAllowsRadar(activeId)) {
       suspendImagery();
@@ -268,7 +277,10 @@ export function createWeatherRadarLayer({
       return;
     }
     void (async () => {
-      if (explicitIntent) await ensureTerrainGlobe('user');
+      if (deferredTerrainSwitch) {
+        deferredTerrainSwitch = false;
+        await ensureTerrainGlobe('user');
+      }
       await resumePaint();
     })();
   }
@@ -316,6 +328,8 @@ export function createWeatherRadarLayer({
       radar.attach(viewer);
       radar.setOpacity(opacityPercent / 100);
       enabled = false;
+      resetPlaybackMode();
+      deferredTerrainSwitch = false;
       frames = [];
       currentId = null;
       catalogStatus = 'idle';
@@ -326,10 +340,12 @@ export function createWeatherRadarLayer({
 
     async enable(_viewer, { origin = 'programmatic' } = {}) {
       enabled = true;
-      if (isExplicitRadarIntent(origin)) explicitIntent = true;
       cockpitActive = readCockpitActive(host);
       bindListeners();
       if (cockpitActive) {
+        if (isExplicitRadarIntent(origin) && !stackAllowsRadar(getActiveStackId())) {
+          deferredTerrainSwitch = true;
+        }
         suspendImagery();
         await refreshCatalog();
         notifyRow();
@@ -353,7 +369,7 @@ export function createWeatherRadarLayer({
 
     async disable() {
       enabled = false;
-      explicitIntent = false;
+      deferredTerrainSwitch = false;
       fetchEpoch += 1;
       catalogInflight = null;
       loading = false;
@@ -363,7 +379,7 @@ export function createWeatherRadarLayer({
       lastError = null;
       lastUpdate = null;
       retrievedAt = null;
-      stopPlayback();
+      resetPlaybackMode();
       radar.clear();
       unbindListeners();
       await restoreOwnedStack();
