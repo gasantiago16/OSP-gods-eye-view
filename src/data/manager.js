@@ -17,6 +17,9 @@ const FEED_STATE_LABELS = Object.freeze({
   stale: 'STALE',
   fallback: 'FALLBACK',
   unavailable: 'UNAVAILABLE',
+  history: 'PLAYBACK',
+  'terrain-required': 'MAP',
+  'cockpit-suspended': 'COCKPIT',
 });
 
 const SUPERSEDED_VISIBILITY_INTENT = Symbol('superseded-visibility-intent');
@@ -67,7 +70,7 @@ function refreshFailureFromStats(stats, label) {
 /**
  * Normalize heterogeneous layer stats into one honest control-chip state.
  * @param {object|null} stats Layer getStats() result.
- * @returns {'nominal'|'loading'|'degraded'|'stale'|'fallback'|'unavailable'} Feed state.
+ * @returns {'nominal'|'loading'|'degraded'|'stale'|'fallback'|'unavailable'|'history'|'terrain-required'|'cockpit-suspended'} Feed state.
  */
 export function layerFeedState(stats = {}) {
   const state = stats || {};
@@ -76,6 +79,9 @@ export function layerFeedState(stats = {}) {
   const hasExplicitFallback = typeof state.fallback === 'boolean';
   const hasPriorData = Number(state.count) > 0 || Boolean(state.lastUpdate);
   const presentedError = state.error || state.lastError || state.managerRefreshError;
+  if (status === 'terrain-required' || status === 'cockpit-suspended' || status === 'history') {
+    return status;
+  }
   if (['unavailable', 'offline', 'down', 'error'].includes(status)) return 'unavailable';
   if (
     (presentedError || state.unavailable === true || state.available === false)
@@ -892,7 +898,7 @@ export class DataLayerManager {
       entry.lifecycleUncertain = false;
       this._setVisibilityIntentPhase(entry, intentEpoch, 'enable');
       try {
-        const enabled = await entry.module.enable(this.viewer, { signal });
+        const enabled = await entry.module.enable(this.viewer, { signal, origin });
         if (enabled === false) throw lifecycleRejectedError(layerId, 'enable');
       } catch (e) {
         if (signal?.aborted || isAbortError(e)) {
@@ -2040,7 +2046,7 @@ export class DataLayerManager {
 
       const count = document.createElement('span');
       count.className = 'data-count';
-      count.textContent = layer.stats.count ? this._formatCount(layer.stats.count) : '—';
+      count.textContent = this._formatCountDisplay(layer.stats);
 
       const toggle = document.createElement('button');
       toggle.className = `data-toggle-btn${layer.enabled ? ' active' : ''}`;
@@ -2170,7 +2176,8 @@ export class DataLayerManager {
       swatch.className = 'data-toggle-legend-swatch';
       swatch.style.background = item.color;
       const text = document.createElement('span');
-      text.textContent = `${item.label} ${this._formatCount(item.count)}`;
+      const countText = Number.isFinite(item.count) ? ` ${this._formatCount(item.count)}` : '';
+      text.textContent = `${item.label}${countText}`;
       entry.append(swatch, text);
       container.appendChild(entry);
     }
@@ -2195,7 +2202,7 @@ export class DataLayerManager {
 
       const count = row.querySelector('.data-count');
       if (count) {
-        count.textContent = layer.stats.count ? this._formatCount(layer.stats.count) : '—';
+        count.textContent = this._formatCountDisplay(layer.stats);
       }
 
       const meta = row.querySelector('.data-toggle-meta');
@@ -2218,6 +2225,12 @@ export class DataLayerManager {
     }
     if (layer.lifecycleUncertain) {
       return `UNCERTAIN · ${source} · lifecycle state requires reconciliation`;
+    }
+    if (stats.status === 'terrain-required') {
+      return `TERRAIN MAP REQUIRED · ${source}`;
+    }
+    if (stats.status === 'cockpit-suspended') {
+      return `COCKPIT · ${source}`;
     }
     const presentedError = stats.error || stats.lastError || stats.managerRefreshError;
     if (presentedError) {
@@ -2276,6 +2289,13 @@ export class DataLayerManager {
   _formatCount(n) {
     if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
     return String(n);
+  }
+
+  _formatCountDisplay(stats = {}) {
+    if (typeof stats.countLabel === 'string' && stats.countLabel.trim()) {
+      return stats.countLabel.trim();
+    }
+    return stats.count ? this._formatCount(stats.count) : '—';
   }
 
   _timeAgo(timestamp) {

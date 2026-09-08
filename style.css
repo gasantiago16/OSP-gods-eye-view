@@ -5856,7 +5856,10 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
 .data-toggle-btn.feed-degraded,
 .data-toggle-btn.feed-stale,
 .data-toggle-btn.feed-fallback,
-.data-toggle-btn.feed-unavailable {
+.data-toggle-btn.feed-unavailable,
+.data-toggle-btn.feed-history,
+.data-toggle-btn.feed-terrain-required,
+.data-toggle-btn.feed-cockpit-suspended {
   min-width: 82px;
   letter-spacing: 0.8px;
 }
@@ -5871,6 +5874,14 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   border-color: var(--accent);
   background: var(--accent-dim);
   box-shadow: 0 0 10px rgba(0, 212, 255, 0.15);
+}
+
+.data-toggle-btn.active.feed-terrain-required,
+.data-toggle-btn.active.feed-cockpit-suspended {
+  color: #ffd27a;
+  border-color: rgba(255, 190, 82, 0.75);
+  background: rgba(255, 174, 51, 0.1);
+  box-shadow: 0 0 10px rgba(255, 174, 51, 0.12);
 }
 
 .data-toggle-btn.active.feed-stale,

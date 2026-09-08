@@ -1044,6 +1044,30 @@ test('generic layer visibility exposes lifecycle truth for every manager phase a
   });
 });
 
+test('generic voice visibility maps weather radar aliases onto weather-radar', async () => {
+  globalThis.window = globalThis.window || { clearTimeout, setTimeout, requestIdleCallback: null };
+  const viewer = {
+    clock: { onTick: { addEventListener: () => () => {} } },
+    scene: { canvas: { addEventListener() {}, removeEventListener() {} } },
+    camera: { moveEnd: { addEventListener() {} } },
+  };
+  const calls = [];
+  const dataManager = {
+    layers: new Map([['weather-radar', { module: {} }]]),
+    getAll: () => [{ id: 'weather-radar', name: 'Weather Radar' }],
+    getLayerLifecycleState: () => ({ enabled: true, lifecycleState: 'enabled', uncertain: false }),
+    async setEnabled(...args) { calls.push(args); return true; },
+  };
+  const runner = createGevActionRunner({ viewer, styleManager: {}, dataManager });
+  for (const spoken of ['weather radar', 'radar', 'precip']) {
+    calls.length = 0;
+    const result = await runner('set_layer_visibility', { layerId: spoken, enabled: true });
+    assert.equal(result.ok, true, spoken);
+    assert.equal(result.layerId, 'weather-radar');
+    assert.deepEqual(calls, [['weather-radar', true, { origin: 'voice' }]]);
+  }
+});
+
 test('generic voice visibility maps Space Missions to the explicit mission layer', async () => {
   globalThis.window = globalThis.window || { clearTimeout, setTimeout, requestIdleCallback: null };
   const viewer = {

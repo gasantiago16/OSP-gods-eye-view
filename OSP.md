@@ -57,6 +57,11 @@ Port **4173** is intentional. OSP World Track owns **5173**.
 
 ## First features worth adding
 
+Live RainViewer weather radar ships as the `weather-radar` layer (terrain globe,
+owned playback clock). The [live weather imagery plan](docs/LIVE-WEATHER-IMAGERY-PLAN.md)
+still describes later GIBS/nowCOAST satellite work. Weather display does not
+modify OSP trajectories.
+
 Ordered by unique OSP value, not by how flashy they look on a globe GEV already has.
 
 1. **`osp-twins` layer** — load an OSP artifact (CSV/JSON from `artifacts/` or a small exporter) as a Cesium polyline + vehicle. Label it `OSP ECI TRUTH`. First target: Falcon 9 circular-LEO demo, then Boca→Maui PTP. This is the honest replacement for GEV's cinematic launch replay *when we have a twin*.

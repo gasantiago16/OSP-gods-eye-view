@@ -1831,6 +1831,9 @@ test('layer feed states distinguish unavailable, fallback, stale, and degraded c
   assert.equal(layerFeedState({ error: 'partial group failure', count: 50, lastUpdate: 1 }), 'degraded');
   assert.equal(layerFeedState({ loading: true }), 'loading');
   assert.equal(layerFeedState({ count: 5, lastUpdate: 1 }), 'nominal');
+  assert.equal(layerFeedState({ status: 'terrain-required', lastUpdate: 1 }), 'terrain-required');
+  assert.equal(layerFeedState({ status: 'cockpit-suspended', lastUpdate: 1 }), 'cockpit-suspended');
+  assert.equal(layerFeedState({ status: 'history', lastUpdate: 1 }), 'history');
 });
 
 test('layer metadata names degraded state instead of presenting an ordinary age', () => {
@@ -1847,6 +1850,11 @@ test('layer metadata names degraded state instead of presenting an ordinary age'
     source: 'CelesTrak',
     stats: { error: 'CelesTrak unreachable', count: 0, lastUpdate: null },
   }), 'UNAVAILABLE · CelesTrak · CelesTrak unreachable');
+  assert.equal(mgr._buildMetaText({
+    source: 'RAINVIEWER',
+    stats: { status: 'terrain-required', count: 12, lastUpdate: 1 },
+  }), 'TERRAIN MAP REQUIRED · RAINVIEWER');
+  assert.equal(mgr._formatCountDisplay({ countLabel: '12 MIN', count: 12 }), '12 MIN');
   assert.equal(mgr._buildMetaText({
     source: 'CelesTrak',
     stats: {

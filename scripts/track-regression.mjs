@@ -261,6 +261,32 @@ async function main() {
         });
         return;
       }
+      // Mapped installations hit Overpass via /api/military-installations.
+      // This harness is about 3D tracking, not OSM. A live 503 was failing
+      // the console-error and HTTP-5xx catch-alls (97/100) while tracking
+      // invariants were green. Stub an empty ready payload.
+      if (url.origin === APP_ORIGIN && url.pathname === '/api/military-installations') {
+        request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            elements: [],
+            saturated: false,
+            elementCap: 48,
+            retrievedAt: new Date().toISOString(),
+            status: 'ready',
+          }),
+        });
+        return;
+      }
+      if (url.origin === APP_ORIGIN && url.pathname === '/api/google/text-search') {
+        request.respond({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ places: [] }),
+        });
+        return;
+      }
       request.continue();
     });
 
@@ -402,6 +428,18 @@ async function main() {
         }
         if (isAppRequest && url.pathname === '/api/google/nearby-places') {
           return Promise.resolve(jsonResponse({ places: [] }));
+        }
+        if (isAppRequest && url.pathname === '/api/google/text-search') {
+          return Promise.resolve(jsonResponse({ places: [] }));
+        }
+        if (isAppRequest && url.pathname === '/api/military-installations') {
+          return Promise.resolve(jsonResponse({
+            elements: [],
+            saturated: false,
+            elementCap: 48,
+            retrievedAt: new Date().toISOString(),
+            status: 'ready',
+          }));
         }
         // adsb.lol military: { ac: [ aircraft{} ] }  (must come AFTER /trace check)
         if (isAppRequest && url.pathname === '/api/adsblol/mil') {

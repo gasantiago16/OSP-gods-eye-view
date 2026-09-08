@@ -176,6 +176,12 @@ const LAYER_ALIASES = new Map([
   ['firms', 'local-firms'],
   ['fires', 'local-firms'],
   ['active fires', 'local-firms'],
+  ['weather-radar', 'weather-radar'],
+  ['weather radar', 'weather-radar'],
+  ['radar', 'weather-radar'],
+  ['precip', 'weather-radar'],
+  ['precipitation', 'weather-radar'],
+  ['precipitation radar', 'weather-radar'],
 ]);
 
 const CITY_ALIASES = new Map([

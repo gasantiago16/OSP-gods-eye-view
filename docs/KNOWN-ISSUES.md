@@ -105,4 +105,4 @@ Context:
   three VIIRS NRT sources (trailing 24 h, 30 min cache, serve-stale-on-failure) and the
   bundled snapshot was deleted. Requires a free server-side `FIRMS_MAP_KEY`; without it
   the layer shows a KEY REQUIRED state.
-- Weather radar is still held out of OSS v1 after QA found the previous overlay did not provide reliable visible value.
+- Weather radar now ships as `weather-radar` (RainViewer, terrain globe). Zoom 7 is coarse at taxiway scale; transparent tiles are not clear skies. PLAY steps advertised frames at 20s so the 100 req/IP/min RainViewer cap is not immediately blown at regional zoom; holes can still appear on a full-globe PLAY. GIBS/nowCOAST satellite imagery remains later work.
