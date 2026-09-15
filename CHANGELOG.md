@@ -3,6 +3,14 @@
 This changelog records public product changes. For the authoritative description
 of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
+## [Unreleased] — 2026-09-15
+
+### Added
+
+- Weather flags HUD in DATA LAYERS. GEV proxies loopback World Track
+  (`/api/osp-world/weather`) for NOAA MRMS dBZ and human-ack flags. RainViewer
+  stays the picture. Not ATC.
+
 ## [Unreleased] — 2026-09-04
 
 ### Added

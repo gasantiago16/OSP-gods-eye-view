@@ -102,6 +102,13 @@ export const DATA_CREDITS = [
       '(personal/educational use; Universal Blue composite reflectivity)',
   },
   {
+    key: 'noaa-mrms',
+    html:
+      'Weather flags (numeric dBZ): NOAA MRMS via World Track — ' +
+      '<a href="https://registry.opendata.aws/noaa-mrms-pds/" target="_blank" rel="noopener">NODD</a> ' +
+      '(attribute NOAA MRMS; not ATC)',
+  },
+  {
     key: 'google-news-rss',
     html:
       'Cockpit regional headlines: ' +

@@ -5987,6 +5987,64 @@ body.cockpit-mode #intel-hud .hud-right-edge { right: 22px; }
   cursor: default;
 }
 
+.weather-flags-hud {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: var(--font-mono);
+}
+
+.weather-flags-title {
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  color: var(--text-dim);
+}
+
+.weather-flags-status {
+  margin-top: 4px;
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+
+.weather-flags-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.weather-flags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 8px;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+}
+
+.weather-flags-row.sev-warning { color: #ff8585; }
+.weather-flags-row.sev-caution { color: #ffcc66; }
+.weather-flags-row.sev-advisory { color: #8fd3ff; }
+
+.weather-flags-row button {
+  padding: 1px 6px;
+  font: inherit;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.weather-flags-note {
+  margin-top: 6px;
+  font-size: 8px;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+  opacity: 0.8;
+}
+
 .data-toggle-legend-swatch {
   width: 6px;
   height: 6px;

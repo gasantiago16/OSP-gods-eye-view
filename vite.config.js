@@ -19,6 +19,7 @@
  *  14. Rocket launches — recent Launch Library 2 mission metadata
  *  15. Radio Browser — public-domain station directory and click counting
  *  16. Weather radar — RainViewer catalog + Universal Blue tiles (zoom ≤ 7)
+ *  17. World Track — loopback weather samples + Stage A flags (`/api/osp-world`)
  *
  * Also exposes Cesium and Google 3D Tiles API keys to the
  * client via `import.meta.env.*` defines.
@@ -63,6 +64,7 @@ import {
 } from './src/data/terrainHeightsProxy.js';
 import { VOICE_MODELS, isKnownVoiceTier, resolveVoiceModel } from './src/voice/voiceCost.js';
 import { weatherRadarProxyPlugin } from './src/server/weatherRadarProxy.js';
+import { ospWorldProxyPlugin } from './src/server/ospWorldProxy.js';
 
 /** Resolve __dirname for ESM context. */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -7371,6 +7373,9 @@ export default defineConfig(({ mode }) => {
       regionalBriefProxy(),
       weatherEffectsProxy(),
       weatherRadarProxyPlugin(),
+      ospWorldProxyPlugin({
+        origin: env.WORLD_TRACK_URL || 'http://127.0.0.1:8765',
+      }),
       cctvProxy(),
       radioBrowserProxy(),
       gbfsProxy(),
