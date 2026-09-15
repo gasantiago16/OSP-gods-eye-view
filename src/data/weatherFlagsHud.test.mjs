@@ -96,6 +96,7 @@ test('HUD polls camera LLA and posts ACK', async () => {
   assert.match(hud.getView().catalogStatus, /ready/);
   assert.equal(hud.getView().pending.length, 1);
   assert.ok(calls.some((c) => c.url.includes('/api/osp-world/weather?lat=29.98')));
+  assert.ok(calls.some((c) => c.url.includes('twins=true')));
   await root.listeners.click({
     target: { closest: () => ({ dataset: { flagId: '11111111-1111-1111-1111-111111111111', ack: 'acked' } }) },
   });

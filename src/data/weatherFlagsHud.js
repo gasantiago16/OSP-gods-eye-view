@@ -62,7 +62,9 @@ export function createWeatherFlagsHud({
       ? `lat=${encodeURIComponent(pos.lat)}&lon=${encodeURIComponent(pos.lon)}`
       : '';
     const sampleQuery = where ? `?${where}` : '';
-    const flagsQuery = where ? `?${where}&record=true` : '?record=true';
+    const flagsQuery = where
+      ? `?${where}&record=true&twins=true`
+      : '?record=true&twins=true';
     try {
       const [weatherRes, flagsRes] = await Promise.all([
         fetchImpl(`${WEATHER_SAMPLE_URL}${sampleQuery}`),
