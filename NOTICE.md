@@ -1,6 +1,6 @@
 # NOTICE
 
-This repository is a private derivative of:
+This repository is a public derivative of:
 
 **God's Eye View**  
 https://github.com/bilawalsidhu/gods-eye-view  

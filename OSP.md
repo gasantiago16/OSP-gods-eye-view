@@ -1,7 +1,7 @@
 # OSP-gods-eye-view — intake + riff plan
 
-Private riff of [bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © 2026 Bilawal Sidhu).
-This repo is **not** an upstream GitHub fork: public-repo forks cannot be private.
+Public riff of [bilawalsidhu/gods-eye-view](https://github.com/bilawalsidhu/gods-eye-view) (MIT, © 2026 Bilawal Sidhu).
+This repo is **not** an upstream GitHub fork (it started private). Keep Sidhu’s copyright and `UPSTREAM_README.md`.
 `origin` = `gasantiago16/OSP-gods-eye-view`. `upstream` = `bilawalsidhu/gods-eye-view`.
 
 **Local:** `C:\Users\gasan\Projects\OSP-gods-eye-view`  
