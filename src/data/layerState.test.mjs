@@ -239,6 +239,12 @@ test('weather-radar share token n is off when absent and default opacity is omit
   assert.deepEqual(enabled.enabledLayerIds, ['weather-radar']);
   assert.equal(enabled.options['weather-radar'].opacity, 65);
   assert.equal(encode(enabled).includes('lo='), false);
+  assert.equal(enabled.options['weather-radar'].opacityChosen, false);
+
+  const chosen = decodeLayerStateParams(new URLSearchParams('v=2&l=n&lo=n.c.1'));
+  assert.equal(chosen.options['weather-radar'].opacity, 65);
+  assert.equal(chosen.options['weather-radar'].opacityChosen, true);
+  assert.match(encode(chosen), /lo=n\.c\.1/);
 
   const faded = decodeLayerStateParams(new URLSearchParams('v=2&l=n&lo=n.o.40'));
   assert.equal(faded.options['weather-radar'].opacity, 40);

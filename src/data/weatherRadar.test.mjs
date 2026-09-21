@@ -221,7 +221,21 @@ test('3D hides radar until Show on Aerial', async () => {
   assert.equal(world.layer.setParams(chip.params), true);
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(world.getStack(), 'bing-aerial');
+  assert.equal(world.layer.getParams().opacity, 40);
   assert.equal(world.layer.getStats().status, 'latest');
+});
+
+test('a chosen 65 stays 65 on Bing after restore', async () => {
+  const world = createLayer({
+    stackId: 'bing-aerial',
+    isStackAvailable: (id) => id === 'bing-aerial',
+  });
+  world.layer.init({});
+  world.layer.setParams({ opacity: 65, opacityChosen: true }, { origin: 'share-restore' });
+  await world.layer.enable({}, { origin: 'share-restore' });
+  world.host.emit('gev:map-stack-changed', { activeId: 'bing-aerial' });
+  assert.equal(world.layer.getParams().opacity, 65);
+  assert.equal(world.layer.getParams().opacityChosen, true);
 });
 
 test('enable on photoreal switches to OSM and disable restores it', async () => {

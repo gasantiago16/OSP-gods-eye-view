@@ -10,11 +10,11 @@ Shipped radar is a Cesium `ImageryLayer` (RainViewer PNG). That layer is visible
 | Stack | Globe shown? | Radar today |
 |-------|----------------|-------------|
 | `photoreal` (Google 3D, default) | Hidden. 3D Tiles replace the globe. | Invisible. Status `TERRAIN MAP REQUIRED`. |
-| `osm` | Yes. This is the only road basemap left. Bing Road was retired. | Visible. **This is what explicit enable switches to.** |
+| `osm` | Yes. This is the only road basemap left. Bing Road was retired. | Visible. Keyless fallback when Bing Aerial is unavailable. |
 | `bing-aerial` | Yes (needs ion token). | Already allowed by `stackAllowsRadar`. Not chosen on enable. |
 | `bing-labels` | Yes (needs ion token). | Same as aerial, with labels. |
 
-`ensureTerrainGlobe` on user/voice/tool enable calls `setMapStack('osm')` whenever the stack is photoreal. So the first time you turn weather on, you always land on the road map even though Bing would show the same tiles on satellite.
+Explicit enable now prefers Bing Aerial when that stack is available. OSM is only the keyless fallback. Google 3D still cannot show the imagery layer.
 
 Do not set `globe.show = true` under Google 3D. Startup already documents surface/building clipping if both are on.
 

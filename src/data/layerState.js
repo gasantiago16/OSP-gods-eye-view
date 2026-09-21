@@ -258,6 +258,7 @@ const OPTION_GROUPS = Object.freeze({
         return RADAR_OPACITY_PRESETS.includes(numeric) ? numeric : null;
       },
     }),
+    booleanOption('opacityChosen', 'c', false),
   ]),
 });
 

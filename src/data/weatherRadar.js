@@ -231,6 +231,8 @@ export function createWeatherRadarLayer({
       if (!landed) {
         ownedTarget = null;
         stackBeforeRadar = null;
+      } else if (!opacityTouched) {
+        applyStackOpacity(target);
       }
       return stackAllowsRadar(getActiveStackId());
     })();
@@ -486,7 +488,7 @@ export function createWeatherRadarLayer({
       if (Object.hasOwn(next, 'opacity')) {
         const opacity = clampOpacityPercent(next.opacity);
         if (opacity == null) return false;
-        if (explicitOpacity || (origin !== 'programmatic' && opacity !== 65)) {
+        if (explicitOpacity || next.opacityChosen === true) {
           opacityTouched = true;
         }
         if (opacity !== opacityPercent) {
@@ -525,6 +527,7 @@ export function createWeatherRadarLayer({
     getParams() {
       return {
         opacity: opacityPercent,
+        opacityChosen: opacityTouched,
         playing,
         followLatest,
       };
