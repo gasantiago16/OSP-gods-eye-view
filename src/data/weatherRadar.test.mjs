@@ -80,11 +80,11 @@ function createLayer(overrides = {}) {
     now: overrides.now || (() => FRAMES[2].validTime + 60_000),
     getActiveStackId: () => stackId,
     isStackAvailable: overrides.isStackAvailable || (() => false),
-    setMapStack: async (id) => {
+    setMapStack: overrides.setMapStack || (async (id) => {
       stacks.push(id);
       stackId = id;
       return { ok: true, activeStack: id };
-    },
+    }),
     fetchImpl: async (url) => {
       fetches.push(String(url));
       if (overrides.fetchImpl) return overrides.fetchImpl(url, fetches);
@@ -148,6 +148,55 @@ test('a later Labels choice keeps the operator opacity and map', async () => {
   assert.equal(world.getStack(), 'bing-labels');
   await world.layer.disable();
   assert.equal(world.getStack(), 'bing-labels');
+});
+
+test('restored default opacity does not block the Bing preset', async () => {
+  const world = createLayer({
+    stackId: 'photoreal',
+    isStackAvailable: (id) => id === 'bing-aerial',
+  });
+  world.layer.init({});
+  world.layer.setParams({ opacity: 65 }, { origin: 'share-restore' });
+  await world.layer.enable({}, { origin: 'user' });
+  assert.equal(world.getStack(), 'bing-aerial');
+  assert.equal(world.layer.getParams().opacity, 40);
+});
+
+test('enable while already on Bing Aerial uses the satellite opacity', async () => {
+  const world = createLayer({
+    stackId: 'bing-aerial',
+    isStackAvailable: (id) => id === 'bing-aerial',
+  });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.deepEqual(world.stacks, []);
+  assert.equal(world.layer.getParams().opacity, 40);
+});
+
+test('turning radar off during an in-flight Aerial switch restores 3D', async () => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const world = createLayer({
+    stackId: 'photoreal',
+    isStackAvailable: (id) => id === 'bing-aerial',
+    setMapStack: async (id) => {
+      world.stacks.push(id);
+      await gate;
+      world.setStack(id);
+      return { ok: true, activeStack: id };
+    },
+  });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'share-restore' });
+  const switching = world.layer.setParams({ showOnTerrain: true });
+  const disabled = world.layer.disable();
+  release();
+  await switching;
+  await disabled;
+  assert.equal(world.getStack(), 'photoreal');
+  await world.layer.enable({}, { origin: 'user' });
+  await world.layer.disable();
+  assert.equal(world.getStack(), 'photoreal');
 });
 
 test('enable on photoreal falls back to OSM without ion', async () => {

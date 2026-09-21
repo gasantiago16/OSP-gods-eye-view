@@ -1,6 +1,6 @@
 # Weather on more than the road map
 
-**Status:** Implementing on `feat/weather-on-maps`.  
+**Status:** Implemented on `feat/weather-on-maps`. Explicit enable prefers Bing Aerial.  
 **Date:** 2026-09-15
 
 ## Why it looks like a road map

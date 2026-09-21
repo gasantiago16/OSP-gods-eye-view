@@ -2,8 +2,9 @@
  * Live RainViewer composite radar layer.
  *
  * Cesium imagery is invisible on Google Photoreal 3D (`globe.show === false`).
- * Enabling this layer on photoreal switches to OSM terrain, then restores that
- * stack on disable only if this layer still owns the switch.
+ * Enabling this layer on photoreal switches to Bing Aerial when that stack is
+ * available, otherwise OSM, then restores the previous stack on disable only
+ * if this layer still owns the switch.
  */
 
 import { createRadarRenderer } from '../weather/radarRenderer.js';
@@ -56,6 +57,7 @@ export function createWeatherRadarLayer({
   getActiveStackId = () => null,
   setMapStack = null,
   isStackAvailable = () => false,
+  onStackOpacity = null,
   now = () => Date.now(),
   host = globalThis,
   requestRender = governorRequestRender,
@@ -82,6 +84,8 @@ export function createWeatherRadarLayer({
   let ownedTarget = null;
   let opacityTouched = false;
   let radarSwitchPending = false;
+  let switchInflight = null;
+  let switchEpoch = 0;
   let deferredTerrainSwitch = false;
   let catalogInflight = null;
   let playbackTimer = null;
@@ -192,6 +196,7 @@ export function createWeatherRadarLayer({
     if (next === opacityPercent) return;
     opacityPercent = next;
     radar.setOpacity(next / 100);
+    if (typeof onStackOpacity === 'function') onStackOpacity(next);
   }
 
   async function ensureTerrainGlobe(origin) {
@@ -199,18 +204,42 @@ export function createWeatherRadarLayer({
     if (stackAllowsRadar(active)) return true;
     if (!isExplicitRadarIntent(origin) || typeof setMapStack !== 'function') return false;
     const target = preferredTerrainStack();
-    stackBeforeRadar = active;
-    ownedTarget = target;
-    radarSwitchPending = true;
+    const before = active;
+    const epoch = ++switchEpoch;
+    const work = (async () => {
+      stackBeforeRadar = before;
+      ownedTarget = target;
+      radarSwitchPending = true;
+      try {
+        await setMapStack(target);
+      } finally {
+        radarSwitchPending = false;
+      }
+      if (epoch !== switchEpoch) return false;
+      if (!enabled) {
+        ownsMapSwitch = false;
+        ownedTarget = null;
+        if (getActiveStackId() === target && before && before !== target && typeof setMapStack === 'function') {
+          radarSwitchPending = true;
+          try { await setMapStack(before); } finally { radarSwitchPending = false; }
+        }
+        stackBeforeRadar = null;
+        return false;
+      }
+      const landed = getActiveStackId() === target;
+      ownsMapSwitch = landed;
+      if (!landed) {
+        ownedTarget = null;
+        stackBeforeRadar = null;
+      }
+      return stackAllowsRadar(getActiveStackId());
+    })();
+    switchInflight = work;
     try {
-      await setMapStack(target);
+      return await work;
     } finally {
-      radarSwitchPending = false;
+      if (switchInflight === work) switchInflight = null;
     }
-    const landed = getActiveStackId() === target;
-    ownsMapSwitch = landed;
-    if (landed && !opacityTouched) applyStackOpacity(target);
-    return stackAllowsRadar(getActiveStackId());
   }
 
   async function restoreOwnedStack() {
@@ -385,6 +414,9 @@ export function createWeatherRadarLayer({
         return true;
       }
       const terrainOk = await ensureTerrainGlobe(origin);
+      if (terrainOk && !opacityTouched && isExplicitRadarIntent(origin)) {
+        applyStackOpacity(getActiveStackId());
+      }
       if (!enabled) return false;
       const ok = await refreshCatalog();
       if (!enabled) return false;
@@ -415,6 +447,7 @@ export function createWeatherRadarLayer({
       resetPlaybackMode();
       radar.clear();
       unbindListeners();
+      if (switchInflight) await switchInflight;
       await restoreOwnedStack();
       notifyRow();
       requestRender('weather-radar-disable');
@@ -439,10 +472,11 @@ export function createWeatherRadarLayer({
       rowControlsListener = null;
     },
 
-    setParams(next = {}) {
+    setParams(next = {}, context = {}) {
       let changed = false;
+      const origin = context?.origin || 'user';
+      const explicitOpacity = origin === 'user' || origin === 'voice' || origin === 'tool';
       if (Object.hasOwn(next, 'showOnTerrain') && next.showOnTerrain) {
-        opacityTouched = false;
         void ensureTerrainGlobe('user').then(() => {
           if (enabled && canPaint()) return paintCurrent();
           return false;
@@ -452,7 +486,9 @@ export function createWeatherRadarLayer({
       if (Object.hasOwn(next, 'opacity')) {
         const opacity = clampOpacityPercent(next.opacity);
         if (opacity == null) return false;
-        opacityTouched = true;
+        if (explicitOpacity || (origin !== 'programmatic' && opacity !== 65)) {
+          opacityTouched = true;
+        }
         if (opacity !== opacityPercent) {
           opacityPercent = opacity;
           radar.setOpacity(opacityPercent / 100);

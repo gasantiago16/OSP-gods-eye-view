@@ -30,7 +30,7 @@ npm test
 .\scripts\dev-windows.ps1
 ```
 
-Open **http://localhost:4173**. Enable **weather-radar** in DATA LAYERS (switches Google 3D → OSM so the overlay is actually visible).
+Open **http://localhost:4173**. Enable **weather-radar** in DATA LAYERS. Google 3D hides the overlay; enable switches to Bing Aerial when ion imagery is available, otherwise OSM.
 
 `.env` is gitignored. `GOOGLE_MAPS_API_KEY` and `CESIUM_ION_TOKEN` are client-exposed by upstream design — restrict them; do not try to hide them. See `SECURITY.md`.
 

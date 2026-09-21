@@ -235,6 +235,9 @@ async function init() {
       isStackAvailable: (id) => Boolean(
         mapStackController.getStacks().find((stack) => stack.id === id && stack.available),
       ),
+      onStackOpacity: (opacity) => {
+        dataManager.setLayerParams('weather-radar', { opacity }, { origin: 'programmatic' });
+      },
     }));
     // Restoration starts only after the complete production registry is sealed.
     dataManager.finalizeRegistrations(LAYER_STATE_REGISTRY);
