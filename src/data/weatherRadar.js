@@ -216,6 +216,13 @@ export function createWeatherRadarLayer({
         radarSwitchPending = false;
       }
       if (epoch !== switchEpoch) return false;
+      if (enabled && getActiveStackId() !== target && target === 'bing-aerial') {
+        target = 'osm';
+        ownedTarget = 'osm';
+        radarSwitchPending = true;
+        try { await setMapStack('osm'); } finally { radarSwitchPending = false; }
+      }
+      if (epoch !== switchEpoch) return false;
       if (!enabled) {
         ownsMapSwitch = false;
         ownedTarget = null;
@@ -480,8 +487,8 @@ export function createWeatherRadarLayer({
       const explicitOpacity = origin === 'user' || origin === 'voice' || origin === 'tool';
       if (Object.hasOwn(next, 'showOnTerrain') && next.showOnTerrain) {
         void ensureTerrainGlobe('user').then(() => {
-          if (enabled && canPaint()) return paintCurrent();
-          return false;
+          if (!enabled) return false;
+          return resumePaint();
         }).then(() => notifyRow());
         return true;
       }
@@ -557,7 +564,7 @@ export function createWeatherRadarLayer({
         active: opacityPercent === value,
         disabled,
         title: `Radar opacity ${value}%`,
-        params: { opacity: value },
+        params: { opacity: value, opacityChosen: true },
       })));
       chips.push({
         id: 'latest',

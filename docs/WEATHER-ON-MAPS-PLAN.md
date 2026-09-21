@@ -11,7 +11,7 @@ Shipped radar is a Cesium `ImageryLayer` (RainViewer PNG). That layer is visible
 |-------|----------------|-------------|
 | `photoreal` (Google 3D, default) | Hidden. 3D Tiles replace the globe. | Invisible. Status `TERRAIN MAP REQUIRED`. |
 | `osm` | Yes. This is the only road basemap left. Bing Road was retired. | Visible. Keyless fallback when Bing Aerial is unavailable. |
-| `bing-aerial` | Yes (needs ion token). | Already allowed by `stackAllowsRadar`. Not chosen on enable. |
+| `bing-aerial` | Yes (needs ion token). | Preferred when explicit enable leaves Google 3D. |
 | `bing-labels` | Yes (needs ion token). | Same as aerial, with labels. |
 
 Explicit enable now prefers Bing Aerial when that stack is available. OSM is only the keyless fallback. Google 3D still cannot show the imagery layer.
