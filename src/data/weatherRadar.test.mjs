@@ -79,6 +79,7 @@ function createLayer(overrides = {}) {
     host,
     now: overrides.now || (() => FRAMES[2].validTime + 60_000),
     getActiveStackId: () => stackId,
+    isStackAvailable: overrides.isStackAvailable || (() => false),
     setMapStack: async (id) => {
       stacks.push(id);
       stackId = id;
@@ -116,6 +117,62 @@ test('radar stays off until enable and then paints the latest advertised frame',
   await world.layer.disable();
   assert.equal(world.renderer.shown.length, 0);
   assert.equal(world.layer.getStats().status, 'off');
+});
+
+test('enable on photoreal prefers Bing Aerial when ion imagery is available', async () => {
+  const world = createLayer({
+    stackId: 'photoreal',
+    isStackAvailable: (id) => id === 'bing-aerial',
+  });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.deepEqual(world.stacks, ['bing-aerial']);
+  assert.equal(world.getStack(), 'bing-aerial');
+  assert.equal(world.layer.getParams().opacity, 40);
+  assert.equal(world.renderer.shown.at(-1), '1788564600');
+  await world.layer.disable();
+  assert.deepEqual(world.stacks, ['bing-aerial', 'photoreal']);
+});
+
+test('a later Labels choice keeps the operator opacity and map', async () => {
+  const world = createLayer({
+    stackId: 'photoreal',
+    isStackAvailable: (id) => id === 'bing-aerial' || id === 'bing-labels',
+  });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  world.layer.setParams({ opacity: 100 });
+  world.setStack('bing-labels');
+  world.host.emit('gev:map-stack-changed', { activeId: 'bing-labels' });
+  assert.equal(world.layer.getParams().opacity, 100);
+  assert.equal(world.getStack(), 'bing-labels');
+  await world.layer.disable();
+  assert.equal(world.getStack(), 'bing-labels');
+});
+
+test('enable on photoreal falls back to OSM without ion', async () => {
+  const world = createLayer({ stackId: 'photoreal' });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.deepEqual(world.stacks, ['osm']);
+  assert.equal(world.layer.getParams().opacity, 65);
+});
+
+test('3D hides radar until Show on Aerial', async () => {
+  const world = createLayer({
+    stackId: 'photoreal',
+    isStackAvailable: (id) => id === 'bing-aerial',
+  });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'share-restore' });
+  assert.equal(world.layer.getStats().status, 'terrain-required');
+  assert.match(world.layer.getStats().source, /3D HIDES RADAR/);
+  const chip = world.layer.getRowControls().chips.find((item) => item.id === 'show-on-terrain');
+  assert.equal(chip.label, 'AERIAL');
+  assert.equal(world.layer.setParams(chip.params), true);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(world.getStack(), 'bing-aerial');
+  assert.equal(world.layer.getStats().status, 'latest');
 });
 
 test('enable on photoreal switches to OSM and disable restores it', async () => {

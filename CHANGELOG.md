@@ -5,6 +5,15 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ## [Unreleased] — 2026-09-15
 
+### Changed
+
+- Weather radar enable on Google 3D prefers Bing Aerial (satellite) when Cesium
+  ion imagery is available, and OSM only as the keyless fallback. Google 3D
+  still hides the overlay; an AERIAL/OSM chip shows it without forcing the
+  road map when Aerial works.
+
+## [Unreleased] — 2026-09-15
+
 ### Added
 
 - Weather flags HUD in DATA LAYERS. GEV proxies loopback World Track
@@ -17,7 +26,8 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 - Added a live RainViewer weather radar overlay (`weather-radar`). It drapes
   Universal Blue composite reflectivity on OSM/Bing terrain. Explicit
-  user/voice/tool enable switches Google 3D to OSM so the layer is actually
+  user/voice/tool enable switches Google 3D to Bing Aerial when ion imagery
+  is available, otherwise OSM, so the layer is actually
   visible; share/local restore does not steal the basemap. Advertised past
   frames play without touching `viewer.clock`.
 

@@ -55,6 +55,7 @@ export function createWeatherRadarLayer({
   fetchImpl = (...args) => globalThis.fetch(...args),
   getActiveStackId = () => null,
   setMapStack = null,
+  isStackAvailable = () => false,
   now = () => Date.now(),
   host = globalThis,
   requestRender = governorRequestRender,
@@ -78,6 +79,8 @@ export function createWeatherRadarLayer({
   let cockpitActive = false;
   let ownsMapSwitch = false;
   let stackBeforeRadar = null;
+  let ownedTarget = null;
+  let opacityTouched = false;
   let radarSwitchPending = false;
   let deferredTerrainSwitch = false;
   let catalogInflight = null;
@@ -172,29 +175,53 @@ export function createWeatherRadarLayer({
     }, playbackMs);
   }
 
+  function preferredTerrainStack() {
+    if (typeof isStackAvailable === 'function' && isStackAvailable('bing-aerial')) {
+      return 'bing-aerial';
+    }
+    return 'osm';
+  }
+
+  function stackDefaultOpacity(stackId) {
+    if (stackId === 'bing-aerial' || stackId === 'bing-labels') return 40;
+    return 65;
+  }
+
+  function applyStackOpacity(stackId) {
+    const next = stackDefaultOpacity(stackId);
+    if (next === opacityPercent) return;
+    opacityPercent = next;
+    radar.setOpacity(next / 100);
+  }
+
   async function ensureTerrainGlobe(origin) {
     const active = getActiveStackId();
     if (stackAllowsRadar(active)) return true;
     if (!isExplicitRadarIntent(origin) || typeof setMapStack !== 'function') return false;
+    const target = preferredTerrainStack();
     stackBeforeRadar = active;
+    ownedTarget = target;
     radarSwitchPending = true;
     try {
-      await setMapStack('osm');
+      await setMapStack(target);
     } finally {
       radarSwitchPending = false;
     }
-    const landed = getActiveStackId() === 'osm';
+    const landed = getActiveStackId() === target;
     ownsMapSwitch = landed;
+    if (landed && !opacityTouched) applyStackOpacity(target);
     return stackAllowsRadar(getActiveStackId());
   }
 
   async function restoreOwnedStack() {
     if (!ownsMapSwitch) return;
     const restoreTo = stackBeforeRadar;
-    const stillOnOwnedOsm = getActiveStackId() === 'osm';
+    const target = ownedTarget;
+    const stillOnOwned = getActiveStackId() === target;
     ownsMapSwitch = false;
     stackBeforeRadar = null;
-    if (!stillOnOwnedOsm || !restoreTo || restoreTo === 'osm') return;
+    ownedTarget = null;
+    if (!stillOnOwned || !restoreTo || restoreTo === target) return;
     if (typeof setMapStack === 'function') {
       radarSwitchPending = true;
       try { await setMapStack(restoreTo); } finally { radarSwitchPending = false; }
@@ -270,6 +297,7 @@ export function createWeatherRadarLayer({
       notifyRow();
       return;
     }
+    if (!opacityTouched) applyStackOpacity(activeId);
     void resumePaint();
   }
 
@@ -413,9 +441,18 @@ export function createWeatherRadarLayer({
 
     setParams(next = {}) {
       let changed = false;
+      if (Object.hasOwn(next, 'showOnTerrain') && next.showOnTerrain) {
+        opacityTouched = false;
+        void ensureTerrainGlobe('user').then(() => {
+          if (enabled && canPaint()) return paintCurrent();
+          return false;
+        }).then(() => notifyRow());
+        return true;
+      }
       if (Object.hasOwn(next, 'opacity')) {
         const opacity = clampOpacityPercent(next.opacity);
         if (opacity == null) return false;
+        opacityTouched = true;
         if (opacity !== opacityPercent) {
           opacityPercent = opacity;
           radar.setOpacity(opacityPercent / 100);
@@ -461,14 +498,28 @@ export function createWeatherRadarLayer({
       const status = presentationStatus();
       const disabled = !enabled || status === 'unavailable' || status === 'terrain-required'
         || status === 'cockpit-suspended';
-      const chips = WEATHER_RADAR_OPACITY_PRESETS.map((value) => ({
+      const chips = [];
+      if (status === 'terrain-required') {
+        const aerial = typeof isStackAvailable === 'function' && isStackAvailable('bing-aerial');
+        chips.push({
+          id: 'show-on-terrain',
+          label: aerial ? 'AERIAL' : 'OSM',
+          active: false,
+          disabled: !enabled,
+          title: aerial
+            ? 'Google 3D hides radar. Show it on Bing Aerial.'
+            : 'Google 3D hides radar. Show it on OSM.',
+          params: { showOnTerrain: true },
+        });
+      }
+      chips.push(...WEATHER_RADAR_OPACITY_PRESETS.map((value) => ({
         id: `opacity-${value}`,
         label: `${value}`,
         active: opacityPercent === value,
         disabled,
         title: `Radar opacity ${value}%`,
         params: { opacity: value },
-      }));
+      })));
       chips.push({
         id: 'latest',
         label: 'LATEST',
@@ -512,7 +563,8 @@ export function createWeatherRadarLayer({
       const ageMs = frameAgeMs(current, now());
       const validZ = current ? formatValidTimeZ(current.validTime) : '';
       let source = 'RAINVIEWER';
-      if (status === 'latest') source = 'RAINVIEWER · LIVE';
+      if (status === 'terrain-required') source = '3D HIDES RADAR';
+      else if (status === 'latest') source = 'RAINVIEWER · LIVE';
       else if (status === 'history') source = 'RAINVIEWER · PLAYBACK';
       else if (status === 'stale') source = 'RAINVIEWER · STALE';
       if (validZ) source = `${source} · ${validZ}`;

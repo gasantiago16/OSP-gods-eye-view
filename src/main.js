@@ -232,6 +232,9 @@ async function init() {
     dataManager.register(createWeatherRadarLayer({
       getActiveStackId: () => mapStackController.getActiveId(),
       setMapStack: (id) => styleManager.setMapStack(id),
+      isStackAvailable: (id) => Boolean(
+        mapStackController.getStacks().find((stack) => stack.id === id && stack.available),
+      ),
     }));
     // Restoration starts only after the complete production registry is sealed.
     dataManager.finalizeRegistrations(LAYER_STATE_REGISTRY);
