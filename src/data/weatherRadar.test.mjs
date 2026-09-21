@@ -225,6 +225,37 @@ test('3D hides radar until Show on Aerial', async () => {
   assert.equal(world.layer.getStats().status, 'latest');
 });
 
+test('a restored 100 is not snapped to the Bing preset', async () => {
+  const world = createLayer({
+    stackId: 'osm',
+    isStackAvailable: (id) => id === 'bing-aerial',
+  });
+  world.layer.init({});
+  world.layer.setParams({ opacity: 100 }, { origin: 'local-restore' });
+  await world.layer.enable({}, { origin: 'local-restore' });
+  assert.equal(world.layer.getParams().opacity, 100);
+  world.setStack('bing-aerial');
+  world.host.emit('gev:map-stack-changed', { activeId: 'bing-aerial' });
+  assert.equal(world.layer.getParams().opacity, 100);
+});
+
+test('Bing imagery failure falls back to OSM instead of throwing', async () => {
+  const world = createLayer({
+    stackId: 'photoreal',
+    isStackAvailable: (id) => id === 'bing-aerial',
+    setMapStack: async (id) => {
+      world.stacks.push(id);
+      if (id === 'bing-aerial') return { ok: false, activeStack: 'photoreal' };
+      world.setStack(id);
+      return { ok: true, activeStack: id };
+    },
+  });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.equal(world.getStack(), 'osm');
+  assert.equal(world.layer.getStats().status, 'latest');
+});
+
 test('a chosen 65 stays 65 on Bing after restore', async () => {
   const world = createLayer({
     stackId: 'bing-aerial',

@@ -203,7 +203,7 @@ export function createWeatherRadarLayer({
     const active = getActiveStackId();
     if (stackAllowsRadar(active)) return true;
     if (!isExplicitRadarIntent(origin) || typeof setMapStack !== 'function') return false;
-    const target = preferredTerrainStack();
+    let target = preferredTerrainStack();
     const before = active;
     const epoch = ++switchEpoch;
     const work = (async () => {
@@ -216,7 +216,7 @@ export function createWeatherRadarLayer({
         radarSwitchPending = false;
       }
       if (epoch !== switchEpoch) return false;
-      if (enabled && getActiveStackId() !== target && target === 'bing-aerial') {
+      if (enabled && target === 'bing-aerial' && getActiveStackId() === before) {
         target = 'osm';
         ownedTarget = 'osm';
         radarSwitchPending = true;
@@ -489,13 +489,18 @@ export function createWeatherRadarLayer({
         void ensureTerrainGlobe('user').then(() => {
           if (!enabled) return false;
           return resumePaint();
-        }).then(() => notifyRow());
+        }).then(() => notifyRow()).catch(() => notifyRow());
         return true;
       }
       if (Object.hasOwn(next, 'opacity')) {
         const opacity = clampOpacityPercent(next.opacity);
         if (opacity == null) return false;
         if (explicitOpacity || next.opacityChosen === true) {
+          opacityTouched = true;
+        } else if (
+          (origin === 'share-restore' || origin === 'local-restore')
+          && (opacity === 40 || opacity === 100)
+        ) {
           opacityTouched = true;
         }
         if (opacity !== opacityPercent) {
