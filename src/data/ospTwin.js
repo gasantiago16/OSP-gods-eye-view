@@ -5,6 +5,7 @@
 
 import * as Cesium from 'cesium';
 import { governorRequestRender } from '../renderGovernor.js';
+import { PAD_VIEWS } from './padViews.js';
 
 export const OSP_TWIN_LAYER_ID = 'osp-twin';
 export const OSP_TWIN_URL = '/osp/boca-maui.json';
@@ -137,6 +138,27 @@ export function createOspTwinLayer({
       return true;
     },
 
+    flyToPad(padId) {
+      const pad = PAD_VIEWS[padId];
+      if (!viewer || !pad) return false;
+      if (viewer?.scene?.canvas?.ownerDocument?.body?.classList?.contains('cockpit-mode')) {
+        return false;
+      }
+      const camera = viewer.camera;
+      if (!camera?.flyTo) return false;
+      camera.flyTo({
+        destination: CesiumImpl.Cartesian3.fromDegrees(pad.lon, pad.lat, pad.alt),
+        orientation: {
+          heading: CesiumImpl.Math.toRadians(pad.heading),
+          pitch: CesiumImpl.Math.toRadians(pad.pitch),
+          roll: 0,
+        },
+        duration: 1.6,
+      });
+      requestRender('osp-twin-pad');
+      return true;
+    },
+
     flyTo() {
       if (!viewer || entities.length === 0) return false;
       const sphere = CesiumImpl.BoundingSphere.fromPoints(
@@ -150,14 +172,24 @@ export function createOspTwinLayer({
 
     getRowControls() {
       return {
-        chips: [{
-          id: 'fly',
-          label: 'FLY',
-          active: false,
-          disabled: !enabled || !twin,
-          title: 'Frame the Boca to Maui OSP twin',
-          params: { fly: true },
-        }],
+        chips: [
+          ...Object.values(PAD_VIEWS).map((pad) => ({
+            id: `pad-${pad.id}`,
+            label: pad.label,
+            active: false,
+            disabled: !enabled,
+            title: `${pad.name}. Share link #pad=${pad.id}`,
+            params: { pad: pad.id },
+          })),
+          {
+            id: 'fly',
+            label: 'FLY',
+            active: false,
+            disabled: !enabled || !twin,
+            title: 'Frame the Boca to Maui OSP twin',
+            params: { fly: true },
+          },
+        ],
         legend: [{
           label: OSP_TWIN_LABEL,
           color: '#ffb000',
@@ -167,9 +199,8 @@ export function createOspTwinLayer({
     },
 
     setParams(next = {}) {
-      if (next.fly) {
-        layer.flyTo();
-      }
+      if (next.pad) layer.flyToPad(next.pad);
+      if (next.fly) layer.flyTo();
       return true;
     },
 

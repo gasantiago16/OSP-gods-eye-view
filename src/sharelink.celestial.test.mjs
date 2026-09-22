@@ -171,6 +171,14 @@ test('non-finite camera coordinates fail closed without reserving restoration', 
   }
 
   assert.ok(makeManager('#lat=10&lon=20').parseInitialHash());
+  const boca = makeManager('#pad=boca').parseInitialHash();
+  assert.equal(boca.lat, 25.9971);
+  assert.equal(boca.lon, -97.157);
+  assert.equal(boca.alt, 4500);
+  assert.equal(makeManager('#pad=nope').parseInitialHash(), null);
+  const explicit = makeManager('#pad=boca&lat=1&lon=2').parseInitialHash();
+  assert.equal(explicit.lat, 1);
+  assert.equal(explicit.lon, 2);
   assert.ok(makeManager('#v=2&lat=-10.5&lon=20.25').parseInitialHash());
 });
 

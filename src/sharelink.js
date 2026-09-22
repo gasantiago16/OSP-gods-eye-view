@@ -6,6 +6,7 @@ import {
 } from './data/detectionPolicy.js';
 import { clampScopeTerminusPct } from './scopeMask.js';
 import { decodeLayerStateParams, encodeLayerStateParams } from './data/layerState.js';
+import { padViewFromToken } from './data/padViews.js';
 
 /**
  * Share Links — URL Hash State Management
@@ -156,8 +157,14 @@ export class ShareLinkManager {
     if (!hash) return null;
 
     const params = new URLSearchParams(hash);
-    const lat = parseFloat(params.get('lat'));
-    const lon = parseFloat(params.get('lon'));
+    let lat = parseFloat(params.get('lat'));
+    let lon = parseFloat(params.get('lon'));
+    const padView = padViewFromToken(params.get('pad'));
+    const padFillsCamera = Boolean(padView) && (!Number.isFinite(lat) || !Number.isFinite(lon));
+    if (padFillsCamera) {
+      lat = padView.lat;
+      lon = padView.lon;
+    }
 
     // Coordinates drive Cartesian conversion, so reject non-finite URL values
     // before marking a share restoration as pending. `parseFloat('Infinity')`
@@ -179,9 +186,9 @@ export class ShareLinkManager {
     const state = {
       lat,
       lon,
-      alt: parseOr(params.get('alt'), 800),
-      heading: parseOr(params.get('heading'), 0),
-      pitch: parseOr(params.get('pitch'), -35),
+      alt: parseOr(params.get('alt'), padFillsCamera ? padView.alt : 800),
+      heading: parseOr(params.get('heading'), padFillsCamera ? padView.heading : 0),
+      pitch: parseOr(params.get('pitch'), padFillsCamera ? padView.pitch : -35),
       roll: parseOr(params.get('roll'), 0),
       style,
       styleParams: decodeStyleParamState(params, style),

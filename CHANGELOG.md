@@ -7,6 +7,9 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Added
 
+- Pad cameras for the Boca→Maui twin: BOCA, KSC, VAFB, MAUI chips, and short
+  share links `#pad=boca`, `#pad=ksc`, `#pad=vafb`, `#pad=maui`. An explicit
+  lat/lon in the same link still wins.
 - OSP Twin layer: Boca→Maui `run_ptp` CATCH drawn as a polyline labeled
   OSP ECI TRUTH. Simulated Starship-class hop, miss about 1.1 km. Not a
   Launch Library replay and not a flown vehicle.
