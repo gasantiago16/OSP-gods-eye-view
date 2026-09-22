@@ -7,6 +7,9 @@ of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md
 
 ### Added
 
+- OSP Twin honesty readout. Selecting the amber line shows pack id, miss,
+  LLA, and ECEF derived from that sample. ECI is omitted because the pack
+  has no absolute epoch. Launch Library replay stays a reconstructed estimate.
 - Pad cameras for the Boca→Maui twin: BOCA, KSC, VAFB, MAUI chips, and short
   share links `#pad=boca`, `#pad=ksc`, `#pad=vafb`, `#pad=maui`. An explicit
   lat/lon in the same link still wins.

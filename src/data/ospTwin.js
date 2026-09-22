@@ -23,6 +23,52 @@ export function validateTwin(doc) {
   return null;
 }
 
+const WGS84_A = 6378137;
+const WGS84_E2 = 6.69437999014e-3;
+
+/** ECEF meters from sample LLA. Not ECI — the pack has no absolute epoch. */
+export function llaToEcef(latDeg, lonDeg, altM) {
+  const lat = latDeg * Math.PI / 180;
+  const lon = lonDeg * Math.PI / 180;
+  const sinLat = Math.sin(lat);
+  const cosLat = Math.cos(lat);
+  const n = WGS84_A / Math.sqrt(1 - WGS84_E2 * sinLat * sinLat);
+  return {
+    x: (n + altM) * cosLat * Math.cos(lon),
+    y: (n + altM) * cosLat * Math.sin(lon),
+    z: (n * (1 - WGS84_E2) + altM) * sinLat,
+  };
+}
+
+export function honestyLines(twin, sample) {
+  const ecef = llaToEcef(sample.lat, sample.lon, sample.alt_m);
+  const miss = Number.isFinite(twin.miss_m) ? `${Math.round(twin.miss_m)} m` : 'n/a';
+  return [
+    OSP_TWIN_LABEL,
+    `pack ${twin.missionId || 'unknown'} / ${twin.vehicleId || 'unknown'}`,
+    twin.catch ? `CATCH miss ${miss}` : `NO CATCH miss ${miss}`,
+    `LLA ${sample.lat.toFixed(5)} ${sample.lon.toFixed(5)} ${Math.round(sample.alt_m)} m`,
+    `ECEF ${Math.round(ecef.x)} ${Math.round(ecef.y)} ${Math.round(ecef.z)} m`,
+    'ECI not in pack (no absolute epoch)',
+    'Not a flown vehicle. Not Launch Library.',
+  ];
+}
+
+function honestyLegend(twin, selected) {
+  if (!selected || !twin?.samples?.length) {
+    return [{
+      label: 'Select the amber line',
+      color: '#ffb000',
+      blurb: 'Pack, miss, LLA, and ECEF appear when the twin is selected. ECI is not in this pack.',
+    }];
+  }
+  const sample = twin.samples[twin.samples.length - 1];
+  return honestyLines(twin, sample).map((label) => ({
+    label,
+    color: '#ffb000',
+  }));
+}
+
 export function positionsFromTwin(CesiumImpl, samples) {
   const flat = [];
   for (const sample of samples) {
@@ -42,6 +88,21 @@ export function createOspTwinLayer({
   let entities = [];
   let twin = null;
   let lastError = null;
+  let selected = false;
+  let rowListener = null;
+  let removeSelection = null;
+
+  function notifyRow() {
+    if (typeof rowListener === 'function') rowListener();
+  }
+
+  function syncSelection() {
+    const current = viewer?.selectedEntity;
+    const nowSelected = entities.some((entity) => entity === current);
+    if (nowSelected === selected) return;
+    selected = nowSelected;
+    notifyRow();
+  }
 
   function clearEntities() {
     if (!viewer) {
@@ -59,9 +120,11 @@ export function createOspTwinLayer({
     if (!viewer || !twin) return false;
     const positions = positionsFromTwin(CesiumImpl, twin.samples);
     const end = twin.samples[twin.samples.length - 1];
+    const honesty = honestyLines(twin, end).join('\n');
     const line = viewer.entities.add({
       id: 'osp-twin-boca-maui',
       name: OSP_TWIN_LABEL,
+      description: honesty,
       polyline: {
         positions,
         width: 3,
@@ -73,6 +136,7 @@ export function createOspTwinLayer({
     const marker = viewer.entities.add({
       id: 'osp-twin-boca-maui-catch',
       name: OSP_TWIN_LABEL,
+      description: honesty,
       position: CesiumImpl.Cartesian3.fromDegrees(end.lon, end.lat, end.alt_m),
       point: {
         pixelSize: 10,
@@ -103,6 +167,12 @@ export function createOspTwinLayer({
 
     init(nextViewer) {
       viewer = nextViewer;
+      if (removeSelection) removeSelection();
+      removeSelection = null;
+      const changed = viewer?.selectedEntityChanged;
+      if (changed?.addEventListener) {
+        removeSelection = changed.addEventListener(syncSelection);
+      }
     },
 
     async enable() {
@@ -129,6 +199,7 @@ export function createOspTwinLayer({
 
     async disable() {
       enabled = false;
+      selected = false;
       clearEntities();
       requestRender('osp-twin-clear');
       return true;
@@ -190,12 +261,12 @@ export function createOspTwinLayer({
             params: { fly: true },
           },
         ],
-        legend: [{
-          label: OSP_TWIN_LABEL,
-          color: '#ffb000',
-          blurb: twin?.source || 'Simulated run_ptp. Not a flown vehicle.',
-        }],
+        legend: honestyLegend(twin, selected),
       };
+    },
+
+    setRowControlsListener(listener) {
+      rowListener = listener;
     },
 
     setParams(next = {}) {
@@ -225,6 +296,8 @@ export function createOspTwinLayer({
     },
 
     async destroy() {
+      if (removeSelection) removeSelection();
+      removeSelection = null;
       await layer.disable();
       viewer = null;
       twin = null;
