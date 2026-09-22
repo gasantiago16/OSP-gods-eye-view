@@ -242,8 +242,9 @@ export function createWeatherRadarLayer({
       if (!landed) {
         ownedTarget = null;
         stackBeforeRadar = null;
-      } else if (!opacityTouched) {
-        applyStackOpacity(target);
+      }
+      if (enabled && !opacityTouched && stackAllowsRadar(getActiveStackId())) {
+        applyStackOpacity(getActiveStackId());
       }
       return stackAllowsRadar(getActiveStackId());
     })();

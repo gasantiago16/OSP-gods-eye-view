@@ -265,10 +265,13 @@ test('a newer map choice during Aerial does not get stolen by OSM', async () => 
 });
 
 test('Bing imagery failure falls back to OSM instead of throwing', async () => {
+  let gen = 0;
   const world = createLayer({
     stackId: 'photoreal',
     isStackAvailable: (id) => id === 'bing-aerial',
+    getSwitchGeneration: () => gen,
     setMapStack: async (id) => {
+      gen += 1;
       world.stacks.push(id);
       if (id === 'bing-aerial') return { ok: false, activeStack: 'photoreal' };
       world.setStack(id);
