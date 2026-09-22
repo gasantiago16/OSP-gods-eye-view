@@ -80,6 +80,7 @@ function createLayer(overrides = {}) {
     now: overrides.now || (() => FRAMES[2].validTime + 60_000),
     getActiveStackId: () => stackId,
     isStackAvailable: overrides.isStackAvailable || (() => false),
+    getSwitchGeneration: overrides.getSwitchGeneration || null,
     setMapStack: overrides.setMapStack || (async (id) => {
       stacks.push(id);
       stackId = id;
@@ -237,6 +238,30 @@ test('a restored 100 is not snapped to the Bing preset', async () => {
   world.setStack('bing-aerial');
   world.host.emit('gev:map-stack-changed', { activeId: 'bing-aerial' });
   assert.equal(world.layer.getParams().opacity, 100);
+});
+
+test('a newer map choice during Aerial does not get stolen by OSM', async () => {
+  let gen = 0;
+  const world = createLayer({
+    stackId: 'photoreal',
+    isStackAvailable: (id) => id === 'bing-aerial',
+    getSwitchGeneration: () => gen,
+    setMapStack: async (id) => {
+      const mine = ++gen;
+      world.stacks.push(id);
+      if (id === 'bing-aerial') {
+        gen += 1;
+        world.setStack('photoreal');
+        return { ok: false, activeStack: 'photoreal', generation: mine };
+      }
+      world.setStack(id);
+      return { ok: true, activeStack: id };
+    },
+  });
+  world.layer.init({});
+  await world.layer.enable({}, { origin: 'user' });
+  assert.equal(world.getStack(), 'photoreal');
+  assert.equal(world.stacks.includes('osm'), false);
 });
 
 test('Bing imagery failure falls back to OSM instead of throwing', async () => {

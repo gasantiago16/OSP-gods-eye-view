@@ -235,6 +235,7 @@ async function init() {
       isStackAvailable: (id) => Boolean(
         mapStackController.getStacks().find((stack) => stack.id === id && stack.available),
       ),
+      getSwitchGeneration: () => mapStackController.getSwitchGeneration(),
       onStackOpacity: (opacity) => {
         dataManager.setLayerParams('weather-radar', { opacity }, { origin: 'programmatic' });
       },

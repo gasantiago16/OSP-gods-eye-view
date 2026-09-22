@@ -57,6 +57,7 @@ export function createWeatherRadarLayer({
   getActiveStackId = () => null,
   setMapStack = null,
   isStackAvailable = () => false,
+  getSwitchGeneration = null,
   onStackOpacity = null,
   now = () => Date.now(),
   host = globalThis,
@@ -209,6 +210,7 @@ export function createWeatherRadarLayer({
     const work = (async () => {
       stackBeforeRadar = before;
       ownedTarget = target;
+      const genAtStart = typeof getSwitchGeneration === 'function' ? getSwitchGeneration() : null;
       radarSwitchPending = true;
       try {
         await setMapStack(target);
@@ -216,7 +218,9 @@ export function createWeatherRadarLayer({
         radarSwitchPending = false;
       }
       if (epoch !== switchEpoch) return false;
-      if (enabled && target === 'bing-aerial' && getActiveStackId() === before) {
+      const genAfter = typeof getSwitchGeneration === 'function' ? getSwitchGeneration() : null;
+      const stillOurs = genAtStart == null || genAfter === genAtStart + 1;
+      if (enabled && target === 'bing-aerial' && stillOurs && getActiveStackId() === before) {
         target = 'osm';
         ownedTarget = 'osm';
         radarSwitchPending = true;
