@@ -16,6 +16,7 @@ import militaryInstallationsLayer from './data/militaryInstallations.js';
 import militaryAwarenessLayer from './data/militaryAwareness.js';
 import localDataLayers from './data/localLayers.js';
 import { createWeatherRadarLayer } from './data/weatherRadar.js';
+import { createOspTwinLayer } from './data/ospTwin.js';
 import { createWeatherFlagsHud } from './data/weatherFlagsHud.js';
 import { LAYER_STATE_REGISTRY } from './data/layerState.js';
 import { registerDataCredits } from './data/dataCredits.js';
@@ -240,6 +241,7 @@ async function init() {
         dataManager.setLayerParams('weather-radar', { opacity }, { origin: 'programmatic' });
       },
     }));
+    dataManager.register(createOspTwinLayer());
     // Restoration starts only after the complete production registry is sealed.
     dataManager.finalizeRegistrations(LAYER_STATE_REGISTRY);
     if (import.meta.env.DEV) {

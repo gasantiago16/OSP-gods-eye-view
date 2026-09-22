@@ -3,6 +3,14 @@
 This changelog records public product changes. For the authoritative description
 of current runtime behavior, see [`docs/CURRENT-STATE.md`](docs/CURRENT-STATE.md).
 
+## [Unreleased] — 2026-09-22
+
+### Added
+
+- OSP Twin layer: Boca→Maui `run_ptp` CATCH drawn as a polyline labeled
+  OSP ECI TRUTH. Simulated Starship-class hop, miss about 1.1 km. Not a
+  Launch Library replay and not a flown vehicle.
+
 ## [Unreleased] — 2026-09-15
 
 ### Added

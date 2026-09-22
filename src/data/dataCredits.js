@@ -102,6 +102,12 @@ export const DATA_CREDITS = [
       '(personal/educational use; Universal Blue composite reflectivity)',
   },
   {
+    key: 'osp-twin',
+    html:
+      'OSP twin (Boca→Maui): simulated <code>run_ptp</code> CATCH, labeled OSP ECI TRUTH. ' +
+      'Not a flown vehicle and not a Launch Library replay.',
+  },
+  {
     key: 'noaa-mrms',
     html:
       'Weather flags (numeric dBZ): NOAA MRMS via World Track — ' +

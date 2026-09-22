@@ -64,7 +64,7 @@ modify OSP trajectories.
 
 Ordered by unique OSP value, not by how flashy they look on a globe GEV already has.
 
-1. **`osp-twins` layer** — load an OSP artifact (CSV/JSON from `artifacts/` or a small exporter) as a Cesium polyline + vehicle. Label it `OSP ECI TRUTH`. First target: Falcon 9 circular-LEO demo, then Boca→Maui PTP. This is the honest replacement for GEV's cinematic launch replay *when we have a twin*.
+1. **`osp-twins` layer** — Boca→Maui POC is the `osp-twin` data layer (`/osp/boca-maui.json`), a recorded `run_ptp` CATCH polyline labeled `OSP ECI TRUTH`. Falcon 9 circular-LEO is still later. This does not replace the cinematic Launch Library replay; that stays `RECONSTRUCTED ESTIMATE`.
 2. **World Track bridge** — Vite proxy `/api/osp-world` → `127.0.0.1:8765` (weather samples + flags HUD shipped). Paint OSP-injected multi-pad launches on this globe without copying `spaceflight_world` (still later).
 3. **Pad camera recipes** — Boca, KSC, VAFB, Maui catch site from OSP site LLA. Share-link keys so a demo is a URL.
 4. **Honesty HUD** — when a contact is an OSP twin, show ECI / ECEF / LLA and pack id. When it is LL2 replay, keep `RECONSTRUCTED ESTIMATE`. Never blur those.
